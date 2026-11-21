@@ -22187,9 +22187,9 @@
                    }
                ],
     "schedules":  {
+                      "start":  "2027-03-26T10:00:00",
                       "fast":  {
                   "config":  {
-                      "start":  "2026-04-03T10:00:00",
                       "speedZones":  [
                           { "fromKm": 0, "toKm": 200, "kmPerHour": 24.5 },
                           { "fromKm": 200, "toKm": 500, "kmPerHour": 22 },
@@ -22201,7 +22201,6 @@
                   }
                },"slow":  {
                   "config":  {
-                      "start":  "2026-04-03T10:00:00",
                       "speedZones":  [
                           { "fromKm": 0, "toKm": 200, "kmPerHour": 22.5 },
                           { "fromKm": 200, "toKm": 500, "kmPerHour": 19 },

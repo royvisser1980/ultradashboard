@@ -97,9 +97,9 @@ function localIso(date) {
   return `${normalized.getFullYear()}-${pad(normalized.getMonth()+1)}-${pad(normalized.getDate())}T${pad(normalized.getHours())}:${pad(normalized.getMinutes())}:${pad(normalized.getSeconds())}${milliseconds?'.'+String(milliseconds).padStart(3,'0'):''}`
 }
 
-function buildSchedule(config,totalKm) {
+function buildSchedule(config,start,totalKm) {
   const segments=[],pauses=[];
-  let now=new Date(config.start);
+  let now=new Date(start);
   let km=0;
   let segmentStartKm=0;
   let segmentStartTime=now;
@@ -509,10 +509,12 @@ addEventListener('resize',drawProfile);
           DATA = json;
           DATA.schedules.fast = buildSchedule(
             DATA.schedules.fast.config,
+            DATA.schedules.start,
             DATA.route[DATA.route.length-1][0]
           );
           DATA.schedules.slow = buildSchedule(
             DATA.schedules.slow.config,
+            DATA.schedules.start,
             DATA.route[DATA.route.length-1][0]
           );
           input.max = DATA.total;
