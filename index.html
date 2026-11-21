@@ -197,6 +197,8 @@ function initMap() {
 } const canvas=$('#profile'),ctx=canvas.getContext('2d');
 let cursorKm=0;
 function drawProfile() {
+  if (!DATA) return;
+
   const rect=canvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
   canvas.width=rect.width*dpr;
   canvas.height=rect.height*dpr;
