@@ -13,76 +13,404 @@
           <img class="brand-logo" src="borderline700-logo.png" alt="BORDERLINE700-logo">
           <div>
             <h1>Instellingen</h1>
-            <div class="sub">Pas de starttijd van beide schema's aan.</div>
+            <div class="sub">Starttijd en eigenschappen van beide schema's.</div>
           </div>
         </div>
         <a class="dashboard-link" href="index.html">Terug naar dashboard</a>
       </header>
 
-      <section class="card settings-card">
-        <h2>Startdatum en -tijd</h2>
-        <form id="settingsForm">
+      <form id="settingsForm" novalidate>
+        <section class="card settings-card settings-start-card">
+          <h2>Startdatum en -tijd</h2>
           <label class="settings-field" for="startDate">Startdatum en -tijd</label>
           <input id="startDate" name="startDate" type="datetime-local" step="60" required>
-          <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
-          <div class="form-actions">
-            <a class="button button-secondary" href="index.html">Annuleren</a>
-            <button class="button button-primary" id="saveSettings" type="submit">Opslaan</button>
-          </div>
-        </form>
-      </section>
+        </section>
+
+        <div id="scenarioSettings" class="scenario-settings-grid"></div>
+        <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <a class="button button-secondary" href="index.html">Annuleren</a>
+          <button class="button button-primary" id="saveSettings" type="submit" disabled>Opslaan</button>
+        </div>
+      </form>
     </main>
+    <script src="schedule.js"></script>
     <script>
-      const START_STORAGE_KEY='ultradashboard.startTime';
+      const SETTINGS_STORAGE_KEY='ultradashboard.settings';
+      const LEGACY_START_STORAGE_KEY='ultradashboard.startTime';
       const form=document.querySelector('#settingsForm');
       const startInput=document.querySelector('#startDate');
+      const scenarioContainer=document.querySelector('#scenarioSettings');
       const status=document.querySelector('#settingsStatus');
       const saveButton=document.querySelector('#saveSettings');
+      const scenarioNames=['fast','slow'];
       const setStatus=message=>{status.textContent=message};
+      let routeTotalKm=0;
+      let settingsReady=false;
 
+      function createField(labelText,type,value,fieldName,options={}) {
+        const label=document.createElement('label');
+        label.className='settings-field';
+        const caption=document.createElement('span');
+        caption.textContent=labelText;
+        const input=document.createElement('input');
+        input.type=type;
+        input.value=value===undefined||value===null?'':String(value);
+        input.required=true;
+        input.dataset.field=fieldName;
+        if(options.min!==undefined)input.min=String(options.min);
+        if(options.max!==undefined)input.max=String(options.max);
+        if(options.step!==undefined)input.step=String(options.step);
+        if(options.readOnly)input.readOnly=true;
+        label.append(caption,input);
+        return {label,input};
+      }
+
+      function updateZoneBounds(zoneList) {
+        const rows=[...zoneList.querySelectorAll('.speed-zone')];
+        let previousTo=0;
+        rows.forEach((row,index)=>{
+          const fromInput=row.querySelector('[data-field="zoneFrom"]');
+          const toInput=row.querySelector('[data-field="zoneTo"]');
+          fromInput.value=String(index===0?0:previousTo);
+          fromInput.readOnly=true;
+          const isLast=index===rows.length-1;
+          toInput.readOnly=isLast;
+          if(isLast)toInput.value=String(routeTotalKm);
+          previousTo=Number(toInput.value);
+          const remove=row.querySelector('.zone-remove');
+          remove.disabled=rows.length===1;
+          remove.setAttribute('aria-label',`Verwijder kilometervak ${index+1}`);
+        });
+      }
+
+      function zoneRow(zone,index,zoneList) {
+        const row=document.createElement('div');
+        row.className='speed-zone';
+        const fromField=createField('Vanaf km','number',zone.fromKm,'zoneFrom',{min:0,max:routeTotalKm,step:0.001,readOnly:true});
+        const toField=createField('Tot km','number',zone.toKm===null?routeTotalKm:zone.toKm,'zoneTo',{min:0,max:routeTotalKm,step:0.001});
+        toField.input.addEventListener('input',()=>{
+          updateZoneBounds(zoneList);
+          setStatus('');
+        });
+        row.append(
+          fromField.label,
+          toField.label,
+          createField('Snelheid (km/u)','number',zone.kmPerHour,'zoneSpeed',{min:0.1,step:0.1}).label
+        );
+        const remove=document.createElement('button');
+        remove.type='button';
+        remove.className='button button-secondary zone-remove';
+        remove.textContent='Verwijder';
+        remove.setAttribute('aria-label',`Verwijder kilometervak ${index+1}`);
+        remove.addEventListener('click',()=>{
+          const rows=[...zoneList.querySelectorAll('.speed-zone')];
+          const rowIndex=rows.indexOf(row);
+          if(rows.length<=1)return;
+          if(rowIndex>0) {
+            rows[rowIndex-1].querySelector('[data-field="zoneTo"]').value=
+              row.querySelector('[data-field="zoneTo"]').value;
+          } else if(rows.length>1) {
+            rows[1].querySelector('[data-field="zoneFrom"]').value=
+              row.querySelector('[data-field="zoneFrom"]').value;
+          }
+          row.remove();
+          updateZoneBounds(zoneList);
+          setStatus('');
+          updateFinishPreviews();
+        });
+        row.append(remove);
+        return row;
+      }
+
+      function renderScenario(name,label,config) {
+        const card=document.createElement('section');
+        card.className=`card scenario scenario-settings ${name}`;
+        card.dataset.scenario=name;
+        const heading=document.createElement('h2');
+        heading.textContent=label;
+        card.append(heading);
+
+        const fields=document.createElement('div');
+        fields.className='settings-fields';
+        fields.append(
+          createField('Korte stop na (rij-uren)','number',config.shortBreak.rideHours,'shortRideHours',{min:0.25,max:24,step:0.25}).label,
+          createField('Duur korte stop (minuten)','number',config.shortBreak.minutes,'shortMinutes',{min:1,max:1439,step:1}).label,
+          createField('Avondstop om','time',`${String(config.mealBreak.hour).padStart(2,'0')}:${String(config.mealBreak.minute).padStart(2,'0')}`,'mealTime',{step:60}).label,
+          createField('Duur avondstop (minuten)','number',config.mealBreak.minutes,'mealMinutes',{min:1,max:1439,step:1}).label,
+          createField('Slaapstop begint om','time',`${String(config.sleepBreak.startHour).padStart(2,'0')}:${String(config.sleepBreak.startMinute||0).padStart(2,'0')}`,'sleepTime',{step:60}).label,
+          createField('Duur slaapstop (minuten)','number',config.sleepBreak.minutes,'sleepMinutes',{min:1,max:1439,step:1}).label,
+          createField('Geen slaapstop meer als nog (km) resteert','number',config.sleepBreak.minimumRemainingKm,'sleepMinimumRemainingKm',{min:0,max:routeTotalKm,step:0.1}).label
+        );
+        card.append(fields);
+
+        const zoneHeading=document.createElement('h3');
+        zoneHeading.textContent='Snelheid per kilometervak';
+        card.append(zoneHeading);
+        const help=document.createElement('p');
+        help.className='settings-help';
+        help.textContent=`De vakken moeten aansluiten van 0 tot ${routeTotalKm.toFixed(3)} km, zonder overlap of gaten.`;
+        card.append(help);
+        const zoneList=document.createElement('div');
+        zoneList.className='speed-zone-list';
+        config.speedZones.forEach((zone,index)=>zoneList.append(zoneRow(zone,index,zoneList)));
+        updateZoneBounds(zoneList);
+        card.append(zoneList);
+
+        const addButton=document.createElement('button');
+        addButton.type='button';
+        addButton.className='button button-secondary add-zone';
+        addButton.textContent='Kilometervak toevoegen';
+        addButton.addEventListener('click',()=>{
+          const rows=[...zoneList.querySelectorAll('.speed-zone')];
+          const last=rows[rows.length-1];
+          const from=Number(last.querySelector('[data-field="zoneFrom"]').value);
+          const to=Number(last.querySelector('[data-field="zoneTo"]').value);
+          const speed=Number(last.querySelector('[data-field="zoneSpeed"]').value);
+          const split=Math.round(((from+to)/2)*1000)/1000;
+          if(!Number.isFinite(from)||!Number.isFinite(to)||!Number.isFinite(speed)||split<=from||split>=to) {
+            setStatus(`${label}: het laatste kilometervak is te klein of ongeldig om te splitsen.`);
+            return;
+          }
+          last.querySelector('[data-field="zoneTo"]').value=String(split);
+          zoneList.append(zoneRow({fromKm:split,toKm:to,kmPerHour:speed},rows.length,zoneList));
+          updateZoneBounds(zoneList);
+          setStatus('');
+          updateFinishPreviews();
+        });
+        card.append(addButton);
+        const finishPreview=document.createElement('div');
+        finishPreview.className='finish-preview';
+        const finishLabel=document.createElement('span');
+        finishLabel.textContent='Verwachte finishtijd';
+        const finishValue=document.createElement('strong');
+        finishValue.dataset.finishTime='';
+        finishValue.textContent='Wordt berekend...';
+        finishPreview.append(finishLabel,finishValue);
+        card.append(finishPreview);
+        return card;
+      }
+
+      function isScenarioConfig(config) {
+        return config&&Array.isArray(config.speedZones)&&config.speedZones.length>0&&
+          config.speedZones.every(zone=>zone&&Number.isFinite(Number(zone.fromKm))&&
+            (zone.toKm===null||Number.isFinite(Number(zone.toKm)))&&Number.isFinite(Number(zone.kmPerHour)))&&
+          config.shortBreak&&Number.isFinite(Number(config.shortBreak.rideHours))&&Number.isFinite(Number(config.shortBreak.minutes))&&
+          config.mealBreak&&Number.isFinite(Number(config.mealBreak.hour))&&Number.isFinite(Number(config.mealBreak.minute))&&Number.isFinite(Number(config.mealBreak.minutes))&&
+          config.sleepBreak&&Number.isFinite(Number(config.sleepBreak.startHour))&&
+          Number.isFinite(Number(config.sleepBreak.startMinute||0))&&Number.isFinite(Number(config.sleepBreak.minutes))&&
+          Number.isFinite(Number(config.sleepBreak.minimumRemainingKm));
+      }
+
+      function readSavedSettings() {
+        try {
+          const raw=localStorage.getItem(SETTINGS_STORAGE_KEY);
+          if(raw) {
+            const saved=JSON.parse(raw);
+            if(!saved||typeof saved!=='object')throw new Error('Opgeslagen schema-instellingen zijn ongeldig.');
+            return saved;
+          }
+          const legacyStart=localStorage.getItem(LEGACY_START_STORAGE_KEY);
+          return legacyStart?{start:legacyStart}:null;
+        } catch(error) {
+          console.error(error);
+          setStatus('De opgeslagen instellingen konden niet worden gelezen. Standaardwaarden worden getoond.');
+          return null;
+        }
+      }
+
+      function parseClock(value) {
+        const match=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+        return match?{hour:Number(match[1]),minute:Number(match[2])}:null;
+      }
+
+      function numberFrom(card,field) {
+        const input=card.querySelector(`[data-field="${field}"]`);
+        return input.value.trim()===''?NaN:Number(input.value);
+      }
+
+      function readScenarioConfig(name,label,original) {
+        const card=scenarioContainer.querySelector(`[data-scenario="${name}"]`);
+        const zoneRows=[...card.querySelectorAll('.speed-zone')];
+        if(!zoneRows.length)return {error:`${label}: voeg ten minste één kilometervak toe.`};
+        const zones=[];
+        let previousTo=0;
+        for(let index=0;index<zoneRows.length;index++) {
+          const row=zoneRows[index];
+          let from=numberFrom(row,'zoneFrom');
+          let to=numberFrom(row,'zoneTo');
+          const speed=numberFrom(row,'zoneSpeed');
+          if(!Number.isFinite(from)||!Number.isFinite(to)||!Number.isFinite(speed)||speed<=0) {
+            return {error:`${label}: vul voor ieder kilometervak geldige grenzen en een snelheid groter dan 0 in.`};
+          }
+          if(from<0||to>routeTotalKm+1e-6||to<=from) {
+            return {error:`${label}: kilometervak ${index+1} heeft ongeldige grenzen.`};
+          }
+          if(index===0&&Math.abs(from)>1e-6) {
+            return {error:`${label}: het eerste kilometervak moet bij 0 km beginnen.`};
+          }
+          if(index>0&&from<previousTo-1e-6) {
+            return {error:`${label}: kilometervak ${index+1} overlapt met het vorige vak.`};
+          }
+          if(index>0&&from>previousTo+1e-6) {
+            return {error:`${label}: er zit een gat tussen kilometervak ${index} en ${index+1}.`};
+          }
+          if(index===0)from=0;
+          else from=previousTo;
+          if(Math.abs(to-routeTotalKm)<=1e-6)to=routeTotalKm;
+          zones.push({fromKm:from,toKm:to,kmPerHour:speed});
+          previousTo=to;
+        }
+        if(Math.abs(previousTo-routeTotalKm)>1e-6) {
+          return {error:`${label}: de kilometervakken moeten doorlopen tot ${routeTotalKm.toFixed(3)} km.`};
+        }
+
+        const shortRideHours=numberFrom(card,'shortRideHours');
+        const shortMinutes=numberFrom(card,'shortMinutes');
+        const mealTime=parseClock(card.querySelector('[data-field="mealTime"]').value);
+        const mealMinutes=numberFrom(card,'mealMinutes');
+        const sleepTime=parseClock(card.querySelector('[data-field="sleepTime"]').value);
+        const sleepMinutes=numberFrom(card,'sleepMinutes');
+        const sleepMinimumRemainingKm=numberFrom(card,'sleepMinimumRemainingKm');
+        if(!Number.isFinite(shortRideHours)||shortRideHours<=0||shortRideHours>24) {
+          return {error:`${label}: de tijd tussen korte stops moet groter zijn dan 0 en maximaal 24 uur zijn.`};
+        }
+        if(!Number.isInteger(shortMinutes)||shortMinutes<1||shortMinutes>1439) {
+          return {error:`${label}: de duur van een korte stop moet tussen 1 en 1439 minuten liggen.`};
+        }
+        if(!mealTime||!Number.isInteger(mealMinutes)||mealMinutes<1||mealMinutes>1439) {
+          return {error:`${label}: vul een geldig tijdstip en een duur van 1 tot 1439 minuten in voor de avondstop.`};
+        }
+        if(!sleepTime||!Number.isInteger(sleepMinutes)||sleepMinutes<1||sleepMinutes>1439) {
+          return {error:`${label}: vul een geldig tijdstip en een duur van 1 tot 1439 minuten in voor de slaapstop.`};
+        }
+        if(!Number.isFinite(sleepMinimumRemainingKm)||sleepMinimumRemainingKm<0||sleepMinimumRemainingKm>routeTotalKm) {
+          return {error:`${label}: de afstandsdrempel voor de laatste slaapstop moet tussen 0 en ${routeTotalKm.toFixed(3)} km liggen.`};
+        }
+
+        return {config:{
+          ...original,
+          speedZones:zones,
+          shortBreak:{...original.shortBreak,rideHours:shortRideHours,minutes:shortMinutes},
+          mealBreak:{...original.mealBreak,hour:mealTime.hour,minute:mealTime.minute,minutes:mealMinutes},
+          sleepBreak:{
+            ...original.sleepBreak,
+            startHour:sleepTime.hour,
+            startMinute:sleepTime.minute,
+            minutes:sleepMinutes,
+            minimumRemainingKm:sleepMinimumRemainingKm
+          }
+        }};
+      }
+
+      function updateFinishPreviews() {
+        if(!settingsReady)return;
+        if(!startInput.value||Number.isNaN(new Date(startInput.value).getTime())) {
+          scenarioNames.forEach(name=>{
+            const output=scenarioContainer.querySelector(`[data-scenario="${name}"] [data-finish-time]`);
+            output.textContent='Vul een geldige starttijd in.';
+            output.classList.add('is-invalid');
+          });
+          return;
+        }
+        for(const name of scenarioNames) {
+          const label=name==='fast'?'Snel schema':'Langzaam schema';
+          const output=scenarioContainer.querySelector(`[data-scenario="${name}"] [data-finish-time]`);
+          const result=readScenarioConfig(name,label,currentConfigs[name]);
+          if(result.error) {
+            output.textContent=`Niet berekend: ${result.error}`;
+            output.classList.add('is-invalid');
+            continue;
+          }
+          try {
+            const schedule=buildSchedule(result.config,`${startInput.value}:00`,routeTotalKm);
+            const finish=new Date(schedule.finish);
+            if(Number.isNaN(finish.getTime()))throw new Error('De finishtijd is ongeldig.');
+            output.textContent=new Intl.DateTimeFormat('nl-NL',{
+              weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'
+            }).format(finish);
+            output.classList.remove('is-invalid');
+          } catch(error) {
+            console.error(error);
+            output.textContent='Kon de finishtijd niet berekenen.';
+            output.classList.add('is-invalid');
+          }
+        }
+      }
+
+      form.addEventListener('input',updateFinishPreviews);
+      form.addEventListener('change',updateFinishPreviews);
+
+      form.addEventListener('submit',event=>{
+        event.preventDefault();
+        if(!settingsReady)return;
+        if(!startInput.value||Number.isNaN(new Date(startInput.value).getTime())) {
+          setStatus('Vul een geldige startdatum en -tijd in.');
+          startInput.focus();
+          return;
+        }
+        const saved={start:`${startInput.value}:00`};
+        for(const name of scenarioNames) {
+          const label=name==='fast'?'Snel schema':'Langzaam schema';
+          const result=readScenarioConfig(name,label,currentConfigs[name]);
+          if(result.error) {
+            setStatus(result.error);
+            scenarioContainer.querySelector(`[data-scenario="${name}"]`).scrollIntoView({behavior:'smooth',block:'center'});
+            return;
+          }
+          saved[name]=result.config;
+        }
+        try {
+          localStorage.setItem(SETTINGS_STORAGE_KEY,JSON.stringify(saved));
+        } catch(error) {
+          console.error(error);
+          setStatus('De instellingen konden niet in browseropslag worden opgeslagen.');
+          return;
+        }
+        window.location.href='index.html';
+      });
+
+      let currentConfigs={};
       fetch('data.json')
         .then(response=>{
           if(!response.ok)throw new Error(`Routedata kon niet worden geladen (${response.status})`);
           return response.json();
         })
         .then(data=>{
+          const route=data.route;
+          if(!Array.isArray(route)||route.length<2)throw new Error('De route bevat geen bruikbare kilometervakken.');
+          routeTotalKm=Number(route[route.length-1][0]);
+          if(!Number.isFinite(routeTotalKm)||routeTotalKm<=0)throw new Error('De totale routelengte is ongeldig.');
+          const saved=readSavedSettings();
           const defaultStart=data.schedules.start;
           if(typeof defaultStart!=='string')throw new Error('De standaard starttijd ontbreekt in de routedata.');
           startInput.value=defaultStart.slice(0,16);
-          try {
-            const savedStart=localStorage.getItem(START_STORAGE_KEY);
-            if(savedStart&& !Number.isNaN(new Date(savedStart).getTime())) {
-              startInput.value=savedStart.slice(0,16);
-            } else if(savedStart) {
-              setStatus('De opgeslagen starttijd is ongeldig. Kies een nieuwe starttijd en sla deze op.');
-            }
-          } catch(error) {
-            console.error(error);
-            setStatus('De opgeslagen starttijd kon niet uit browseropslag worden gelezen.');
+          if(saved&&typeof saved.start==='string'&&!Number.isNaN(new Date(saved.start).getTime())) {
+            startInput.value=saved.start.slice(0,16);
+          } else if(saved&&saved.start) {
+            setStatus('De opgeslagen starttijd is ongeldig. Kies een nieuwe starttijd en sla deze op.');
           }
+          for(const name of scenarioNames) {
+            const config=data.schedules[name].config;
+            if(!isScenarioConfig(config))throw new Error(`De standaardinstellingen van het ${name==='fast'?'snelle':'langzame'} schema zijn ongeldig.`);
+            currentConfigs[name]=JSON.parse(JSON.stringify(config));
+            if(saved&&saved[name]) {
+              if(isScenarioConfig(saved[name])) {
+                currentConfigs[name]=JSON.parse(JSON.stringify(saved[name]));
+              } else {
+                setStatus(`De opgeslagen instellingen van het ${name==='fast'?'snelle':'langzame'} schema zijn ongeldig; standaardwaarden worden getoond.`);
+              }
+            }
+            scenarioContainer.append(renderScenario(name,name==='fast'?'Snel schema':'Langzaam schema',currentConfigs[name]));
+          }
+          settingsReady=true;
+          saveButton.disabled=false;
+          updateFinishPreviews();
         })
         .catch(error=>{
           console.error(error);
           setStatus(error.message);
-          saveButton.disabled=true;
         });
-
-      form.addEventListener('submit',event=>{
-        event.preventDefault();
-        if(!startInput.value||Number.isNaN(new Date(startInput.value).getTime())) {
-          setStatus('Vul een geldige startdatum en -tijd in.');
-          startInput.focus();
-          return;
-        }
-        try {
-          localStorage.setItem(START_STORAGE_KEY,`${startInput.value}:00`);
-        } catch(error) {
-          console.error(error);
-          setStatus('De starttijd kon niet in browseropslag worden opgeslagen.');
-          return;
-        }
-        window.location.href='index.html';
-      });
     </script>
   </body>
 </html>

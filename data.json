@@ -22197,7 +22197,7 @@
                       ],
                       "shortBreak":  { "rideHours": 3, "minutes": 15 },
                       "mealBreak":  { "hour": 19, "minute": 0, "minutes": 30 },
-                      "sleepBreak":  { "startHour": 23, "endHour": 5, "minutes": 360, "minimumRemainingKm": 75 }
+                      "sleepBreak":  { "startHour": 23, "startMinute": 0, "minutes": 360, "minimumRemainingKm": 75 }
                   }
                },"slow":  {
                   "config":  {
@@ -22208,7 +22208,7 @@
                       ],
                       "shortBreak":  { "rideHours": 3, "minutes": 20 },
                       "mealBreak":  { "hour": 19, "minute": 0, "minutes": 45 },
-                      "sleepBreak":  { "startHour": 23, "endHour": 7, "minutes": 480, "minimumRemainingKm": 75 }
+                      "sleepBreak":  { "startHour": 23, "startMinute": 0, "minutes": 480, "minimumRemainingKm": 75 }
                   }
                 }
 }
