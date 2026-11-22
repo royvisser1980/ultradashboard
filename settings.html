@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Instellingen - BORDERLINE700</title>
+    <link href="styles.css" rel="stylesheet">
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <img class="brand-logo" src="borderline700-logo.png" alt="BORDERLINE700-logo">
+          <div>
+            <h1>Instellingen</h1>
+            <div class="sub">Pas de starttijd van beide schema's aan.</div>
+          </div>
+        </div>
+        <a class="dashboard-link" href="index.html">Terug naar dashboard</a>
+      </header>
+
+      <section class="card settings-card">
+        <h2>Startdatum en -tijd</h2>
+        <form id="settingsForm">
+          <label class="settings-field" for="startDate">Startdatum en -tijd</label>
+          <input id="startDate" name="startDate" type="datetime-local" step="60" required>
+          <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
+          <div class="form-actions">
+            <a class="button button-secondary" href="index.html">Annuleren</a>
+            <button class="button button-primary" id="saveSettings" type="submit">Opslaan</button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script>
+      const START_STORAGE_KEY='ultradashboard.startTime';
+      const form=document.querySelector('#settingsForm');
+      const startInput=document.querySelector('#startDate');
+      const status=document.querySelector('#settingsStatus');
+      const saveButton=document.querySelector('#saveSettings');
+      const setStatus=message=>{status.textContent=message};
+
+      fetch('data.json')
+        .then(response=>{
+          if(!response.ok)throw new Error(`Routedata kon niet worden geladen (${response.status})`);
+          return response.json();
+        })
+        .then(data=>{
+          const defaultStart=data.schedules.start;
+          if(typeof defaultStart!=='string')throw new Error('De standaard starttijd ontbreekt in de routedata.');
+          startInput.value=defaultStart.slice(0,16);
+          try {
+            const savedStart=localStorage.getItem(START_STORAGE_KEY);
+            if(savedStart&& !Number.isNaN(new Date(savedStart).getTime())) {
+              startInput.value=savedStart.slice(0,16);
+            } else if(savedStart) {
+              setStatus('De opgeslagen starttijd is ongeldig. Kies een nieuwe starttijd en sla deze op.');
+            }
+          } catch(error) {
+            console.error(error);
+            setStatus('De opgeslagen starttijd kon niet uit browseropslag worden gelezen.');
+          }
+        })
+        .catch(error=>{
+          console.error(error);
+          setStatus(error.message);
+          saveButton.disabled=true;
+        });
+
+      form.addEventListener('submit',event=>{
+        event.preventDefault();
+        if(!startInput.value||Number.isNaN(new Date(startInput.value).getTime())) {
+          setStatus('Vul een geldige startdatum en -tijd in.');
+          startInput.focus();
+          return;
+        }
+        try {
+          localStorage.setItem(START_STORAGE_KEY,`${startInput.value}:00`);
+        } catch(error) {
+          console.error(error);
+          setStatus('De starttijd kon niet in browseropslag worden opgeslagen.');
+          return;
+        }
+        window.location.href='index.html';
+      });
+    </script>
+  </body>
+</html>

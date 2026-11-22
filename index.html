@@ -21,11 +21,16 @@
           </div>
         </div>
 
-        <label class="control">
-          Km-stand
-          <input id="kmInput" type="number" min="0" step="0.1">
-          <span>km</span>
-        </label>
+        <div class="header-actions">
+          <label class="control">
+            Km-stand
+            <input id="kmInput" type="number" min="0" step="0.1">
+            <span>km</span>
+          </label>
+          <a class="settings-link" href="settings.html" aria-label="Instellingen" title="Instellingen">
+            <span aria-hidden="true">⚙</span>
+          </a>
+        </div>
       </div>
 
       <div class="grid">
@@ -82,6 +87,7 @@
       let DATA = null;
 
 const $=s=>document.querySelector(s), input=$('#kmInput');
+const START_STORAGE_KEY='ultradashboard.startTime';
 let isEditing=false;
 const fmtKm=n=>`${n.toFixed(1).replace('.',',')} km`;
 const dt=s=>new Date(s);
@@ -507,6 +513,12 @@ addEventListener('resize',drawProfile);
         })
         .then(json => {
           DATA = json;
+          try {
+            DATA.schedules.start = localStorage.getItem(START_STORAGE_KEY) || DATA.schedules.start;
+          } catch (error) {
+            console.error(error);
+            throw new Error('De starttijdinstelling kon niet uit browseropslag worden gelezen.');
+          }
           DATA.schedules.fast = buildSchedule(
             DATA.schedules.fast.config,
             DATA.schedules.start,
@@ -527,7 +539,7 @@ addEventListener('resize',drawProfile);
           console.error(error);
           const warning = $('#mapWarn');
           warning.style.display = 'block';
-          warning.textContent = 'De routedata kon niet worden geladen. Open de pagina via een lokale webserver.';
+          warning.textContent = error.message || 'De routedata kon niet worden geladen. Open de pagina via een lokale webserver.';
         });
     </script>
   </body>
