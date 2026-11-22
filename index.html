@@ -27,9 +27,7 @@
             <input id="kmInput" type="number" min="0" step="0.1">
             <span>km</span>
           </label>
-          <a class="settings-link" href="settings.html" aria-label="Instellingen" title="Instellingen">
-            <span aria-hidden="true">⚙</span>
-          </a>
+          <a class="settings-link" href="settings.html">Tijdschema's</a>
         </div>
       </div>
 
@@ -55,33 +53,60 @@
 
         <div class="scenario-grid full" id="scenarioCards"></div>
 
-        <section class="card full">
-          <h2>Routekaart</h2>
-          <div id="map"></div>
-          <div id="mapWarn" class="warn">
-            De kaartachtergrond kon niet laden. De routegegevens blijven wel beschikbaar in het hoogteprofiel.
+        <section class="card full collapsible-card" data-card-id="route">
+          <h2 class="collapsible-heading">
+            <button class="card-toggle" type="button" aria-expanded="true" aria-controls="routeCardContent">
+              <span>Routekaart</span><span class="card-toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </h2>
+          <div class="collapsible-content" id="routeCardContent">
+            <div id="map"></div>
+            <div id="mapWarn" class="warn">
+              De kaartachtergrond kon niet laden. De routegegevens blijven wel beschikbaar in het hoogteprofiel.
+            </div>
           </div>
         </section>
 
-        <section class="card full">
-          <h2>Hoogteprofiel</h2>
-          <div class="profile-wrap">
-            <canvas id="profile"></canvas>
+        <section class="card full collapsible-card" data-card-id="profile">
+          <h2 class="collapsible-heading">
+            <button class="card-toggle" type="button" aria-expanded="true" aria-controls="profileCardContent">
+              <span>Hoogteprofiel</span><span class="card-toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </h2>
+          <div class="collapsible-content" id="profileCardContent">
+            <div class="profile-wrap">
+              <canvas id="profile"></canvas>
+            </div>
+            <div class="legend">
+              <span><i class="dot" style="background:#9bc9b8"></i>hoogte</span>
+              <span><i class="dot current-km-dot"></i>huidige km-stand</span>
+            </div>
           </div>
-          <div class="legend">
-            <span><i class="dot" style="background:#9bc9b8"></i>hoogte</span>
-            <span><i class="dot" style="background:#c2410c"></i>huidige km-stand</span>
+        </section>
+
+        <section class="card full collapsible-card" data-card-id="progress">
+          <h2 class="collapsible-heading">
+            <button class="card-toggle" type="button" aria-expanded="true" aria-controls="progressCardContent">
+              <span>Voortgang per schema</span><span class="card-toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </h2>
+          <div class="collapsible-content" id="progressCardContent">
+            <div class="progress-chart-wrap">
+              <canvas id="progressChart" role="img" aria-label="Grafiek van afgelegde kilometers per verstreken uur. Klik of sleep verticaal om de km-stand te kiezen."></canvas>
+            </div>
+            <div class="progress-legend" id="progressLegend"></div>
           </div>
         </section>
       </div>
     </div>
-    <script src="schedule.js"></script>
+    <script src="schedule.js?v=2"></script>
     <script>
       let DATA = null;
 
 const $=s=>document.querySelector(s), input=$('#kmInput');
 const SETTINGS_STORAGE_KEY='ultradashboard.settings';
 const LEGACY_START_STORAGE_KEY='ultradashboard.startTime';
+const CURRENT_KM_COLOR=getComputedStyle(document.documentElement).getPropertyValue('--current-km-color').trim();
 let isEditing=false;
 const fmtKm=n=>`${n.toFixed(1).replace('.',',')} km`;
 const dt=s=>new Date(s);
@@ -129,8 +154,12 @@ function interp(k) {
 const scenarioFinish=sc=>arrival(sc,routeEnd());
 function pauseText(p) {
   if(!p)return 'Geen';
-  if(p.type==='Slaapstop')return `${p.type}, vanaf ${fmtTime(p.time)} tot ${fmtTime(p.end)}`;
-  return `${p.type} van ${p.minutes} min, om ${fmtTime(p.time)}`
+  const hours=Math.floor(p.minutes/60),remainingMinutes=p.minutes%60;
+  const duration=p.minutes>60?
+    `${hours}u${remainingMinutes?` ${remainingMinutes} min`:''}`:
+    `${p.minutes} min`;
+  if(p.end)return `${duration} vanaf ${fmtTime(p.time)}`;
+  return `${duration} om ${fmtTime(p.time)}`
 } function scenarioHTML(sc,k) {
   const prev=[...sc.pauses].reverse().find(p=>p.km<=k&&p.km>=k-10), next=sc.pauses.find(p=>p.km>k&&p.km<=k+10);
   return `<div class="schedule-row"><span>Geplande doorkomst</span><span>${fmtTime(arrival(sc,k))}</span></div><div class="schedule-row"><span>Pauze afgelopen 10 km</span><span>${pauseText(prev)}</span></div><div class="schedule-row"><span>Pauze komende 10 km</span><span>${pauseText(next)}</span></div>`
@@ -149,6 +178,59 @@ function pauseText(p) {
     scenario.infoElement=info
   }
 } let map,marker;
+const CARD_STATE_STORAGE_KEY='ultradashboard.dashboardCardState';
+let cardStates={};
+function applyCardCollapsed(card,collapsed) {
+  const toggle=card.querySelector('.card-toggle');
+  const content=document.getElementById(toggle.getAttribute('aria-controls'));
+  card.classList.toggle('is-collapsed',collapsed);
+  toggle.setAttribute('aria-expanded',String(!collapsed));
+  content.hidden=collapsed;
+}
+function setCardCollapsed(card,collapsed) {
+  const id=card.dataset.cardId;
+  applyCardCollapsed(card,collapsed);
+  cardStates[id]=collapsed;
+  try {
+    localStorage.setItem(CARD_STATE_STORAGE_KEY,JSON.stringify(cardStates));
+  } catch(error) {
+    console.error('De weergavestatus van dashboardkaarten kon niet worden opgeslagen.',error);
+  }
+  if(!collapsed) {
+    requestAnimationFrame(()=>{
+      if(id==='route') {
+        if(map)map.resize();
+        updateMap(cursorKm);
+      } else if(id==='profile') {
+        drawProfile();
+      } else if(id==='progress') {
+        drawProgressChart();
+      }
+    });
+  }
+}
+function initializeCollapsibleCards() {
+  try {
+    const saved=localStorage.getItem(CARD_STATE_STORAGE_KEY);
+    if(saved) {
+      const parsed=JSON.parse(saved);
+      if(!parsed||typeof parsed!=='object'||Array.isArray(parsed)) {
+        throw new Error('De opgeslagen kaartweergave is ongeldig.');
+      }
+      cardStates=parsed;
+    }
+  } catch(error) {
+    console.error('De opgeslagen kaartweergave kon niet worden gelezen.',error);
+    cardStates={};
+  }
+  for(const card of document.querySelectorAll('.collapsible-card')) {
+    const collapsed=cardStates[card.dataset.cardId]===true;
+    applyCardCollapsed(card,collapsed);
+    card.querySelector('.card-toggle').addEventListener('click',()=>{
+      setCardCollapsed(card,!card.classList.contains('is-collapsed'));
+    });
+  }
+} initializeCollapsibleCards();
 function initMap() {
   try {
     map=new maplibregl.Map( {
@@ -173,7 +255,7 @@ function initMap() {
       dot.style.height='18px';
       dot.style.border='3px solid #fff';
       dot.style.borderRadius='50%';
-      dot.style.background='#c2410c';
+      dot.style.background=CURRENT_KM_COLOR;
       dot.style.boxShadow='0 2px 8px #17211d66';
       dot.style.cursor='grab';
       marker=new maplibregl.Marker( {
@@ -199,7 +281,7 @@ function initMap() {
   if(!map||!marker)return;
   const p=interp(k);
   marker.setLngLat([p.lon,p.lat]);
-  if(fromMap)return;
+  if(fromMap||$('#routeCardContent').hidden)return;
   const a=interp(Math.max(0,k-10)),b=interp(Math.min(DATA.total,k+10));
   const bounds=new maplibregl.LngLatBounds();
   const start=Math.max(0,k-10),end=Math.min(DATA.total,k+10);
@@ -210,6 +292,7 @@ function initMap() {
     padding:55,maxZoom:13,duration:500
   })
 } const canvas=$('#profile'),ctx=canvas.getContext('2d');
+const progressCanvas=$('#progressChart'),progressContext=progressCanvas.getContext('2d');
 let cursorKm=0;
 function drawProfile() {
   if (!DATA) return;
@@ -262,18 +345,128 @@ function drawProfile() {
   ctx.beginPath();
   ctx.moveTo(x,pad.t);
   ctx.lineTo(x,h-pad.b);
-  ctx.strokeStyle='#c2410c';
+  ctx.strokeStyle=CURRENT_KM_COLOR;
   ctx.lineWidth=2;
   ctx.stroke();
   const p=interp(cursorKm);
-  ctx.fillStyle='#c2410c';
+  ctx.fillStyle=CURRENT_KM_COLOR;
   ctx.beginPath();
   ctx.arc(x,Y(p.ele),5,0,Math.PI*2);
   ctx.fill()
-} function update(v,fromProfile=false,fromMap=false) {
+} function elapsedProgress(schedule,startTime) {
+  const startMilliseconds=new Date(startTime).getTime();
+  const points=[];
+  for(const segment of schedule.segments) {
+    const segmentStart=new Date(segment.t0).getTime();
+    const segmentEnd=new Date(segment.t1).getTime();
+    if(!Number.isFinite(segmentStart)||!Number.isFinite(segmentEnd))continue;
+    if(!points.length) {
+      points.push({hours:0,km:segment.k0});
+    } else {
+      const previous=points[points.length-1];
+      const previousMilliseconds=startMilliseconds+previous.hours*60*60*1000;
+      if(segmentStart>previousMilliseconds) {
+        points.push({
+          hours:(segmentStart-startMilliseconds)/3600000,
+          km:segment.k0
+        });
+      }
+    }
+    points.push({
+      hours:(segmentEnd-startMilliseconds)/3600000,
+      km:segment.k1
+    });
+  }
+  return points
+} function drawProgressChart() {
+  if(!DATA||!DATA.scenarios||!DATA.scenarios.length)return;
+  const rect=progressCanvas.getBoundingClientRect(),dpr=devicePixelRatio||1;
+  if(!rect.width||!rect.height)return;
+  progressCanvas.width=rect.width*dpr;
+  progressCanvas.height=rect.height*dpr;
+  progressContext.setTransform(dpr,0,0,dpr,0,0);
+  const width=rect.width,height=rect.height,pad={left:62,right:18,top:18,bottom:56};
+  const plotWidth=width-pad.left-pad.right,plotHeight=height-pad.top-pad.bottom;
+  const startTime=DATA.schedules.start;
+  const startMilliseconds=new Date(startTime).getTime();
+  const maxHours=Math.max(...DATA.scenarios.map(scenario=>
+    (new Date(scenario.schedule.finish).getTime()-startMilliseconds)/3600000
+  ));
+  if(!Number.isFinite(maxHours)||maxHours<=0)return;
+  const x=hours=>pad.left+hours/maxHours*plotWidth;
+  const y=km=>pad.top+(DATA.total-km)/DATA.total*plotHeight;
+  progressContext.clearRect(0,0,width,height);
+  progressContext.font='12px system-ui';
+  progressContext.lineWidth=1;
+  progressContext.strokeStyle='#e2e8e5';
+  progressContext.fillStyle='#66736d';
+  progressContext.textAlign='right';
+  progressContext.textBaseline='middle';
+  for(let tick=0;tick<=5;tick++) {
+    const km=DATA.total*tick/5,position=y(km);
+    progressContext.beginPath();
+    progressContext.moveTo(pad.left,position);
+    progressContext.lineTo(width-pad.right,position);
+    progressContext.stroke();
+    progressContext.fillText(`${Math.round(km)} km`,pad.left-8,position);
+  }
+  progressContext.textAlign='center';
+  progressContext.textBaseline='top';
+  for(let tick=0;tick<=5;tick++) {
+    const hours=maxHours*tick/5,position=x(hours);
+    progressContext.beginPath();
+    progressContext.moveTo(position,pad.top);
+    progressContext.lineTo(position,height-pad.bottom);
+    progressContext.stroke();
+    progressContext.fillText(`${Math.round(hours)} u`,position,height-pad.bottom+8);
+  }
+  progressContext.save();
+  progressContext.translate(15,pad.top+plotHeight/2);
+  progressContext.rotate(-Math.PI/2);
+  progressContext.textAlign='center';
+  progressContext.textBaseline='middle';
+  progressContext.fillStyle='#66736d';
+  progressContext.fillText('Afgelegd (km)',0,0);
+  progressContext.restore();
+  progressContext.textAlign='center';
+  progressContext.textBaseline='bottom';
+  progressContext.fillText('Verstreken tijd (uren)',pad.left+plotWidth/2,height-3);
+  for(const scenario of DATA.scenarios) {
+    const points=elapsedProgress(scenario.schedule,startTime);
+    if(!points.length)continue;
+    progressContext.beginPath();
+    points.forEach((point,index)=>{
+      const px=x(point.hours),py=y(point.km);
+      if(index===0)progressContext.moveTo(px,py);
+      else progressContext.lineTo(px,py);
+    });
+    progressContext.strokeStyle=scenario.color;
+    progressContext.lineWidth=2.5;
+    progressContext.lineJoin='round';
+    progressContext.lineCap='round';
+    progressContext.stroke();
+  }
+  const cursorY=Math.max(pad.top,Math.min(height-pad.bottom-2,y(cursorKm)-1));
+  progressContext.fillStyle=CURRENT_KM_COLOR;
+  progressContext.fillRect(pad.left,cursorY,plotWidth,2);
+} function renderProgressLegend(scenarios) {
+  const legend=$('#progressLegend');
+  legend.replaceChildren();
+  for(const scenario of scenarios) {
+    const item=document.createElement('span');
+    item.className='progress-legend-item';
+    const line=document.createElement('i');
+    line.className='progress-legend-line';
+    line.style.setProperty('--scenario-color',scenario.color);
+    const name=document.createElement('span');
+    name.textContent=scenario.name;
+    item.append(line,name);
+    legend.append(item);
+  }
+} function update(v,fromPointer=false,fromMap=false) {
   let k=Math.max(0,Math.min(DATA.total,Number(v)||0));
   cursorKm=k;
-  if(!isEditing) input.value=k.toFixed(1);
+  if(!isEditing||fromPointer) input.value=k.toFixed(1);
   const p=interp(k),place=currentMunicipality(k);
   $('#remaining').textContent=fmtKm(DATA.total-k);
   $('#elevation').textContent=`${Math.round(p.ele)} m`;
@@ -284,7 +477,8 @@ function drawProfile() {
     scenario.infoElement.innerHTML=scenarioHTML(scenario.schedule,k)
   }
   updateMap(k,fromMap);
-  drawProfile()
+  drawProfile();
+  drawProgressChart()
 } input.addEventListener('focus',()=>isEditing=true);
 input.addEventListener('input',()=> {
   const v=parseFloat(input.value.replace(',','.'));
@@ -311,7 +505,18 @@ function pointer(e) {
 canvas.addEventListener('pointermove',e=> {
   if(canvas.hasPointerCapture(e.pointerId))pointer(e)
 });
-addEventListener('resize',drawProfile);
+function progressPointer(e) {
+  const rect=progressCanvas.getBoundingClientRect(),top=18,bottom=56;
+  const position=Math.max(top,Math.min(rect.height-bottom,e.clientY-rect.top));
+  update((1-(position-top)/(rect.height-top-bottom))*DATA.total,true)
+} progressCanvas.addEventListener('pointerdown',e=>{
+  progressCanvas.setPointerCapture(e.pointerId);
+  progressPointer(e)
+});
+progressCanvas.addEventListener('pointermove',e=>{
+  if(progressCanvas.hasPointerCapture(e.pointerId))progressPointer(e)
+});
+addEventListener('resize',()=>{drawProfile();drawProgressChart()});
       fetch('data.json')
         .then(response => {
           if (!response.ok) {
@@ -373,9 +578,11 @@ addEventListener('resize',drawProfile);
             schedule:buildSchedule(scenario.config,DATA.schedules.start,DATA.route[DATA.route.length-1][0])
           }));
           renderScenarioCards(DATA.scenarios);
+          renderProgressLegend(DATA.scenarios);
           input.max = DATA.total;
           input.value = '0';
           $('#routeSummary').textContent = `Totale lengte ${fmtKm(routeEnd())} · ${DATA.scenarios.map(scenario=>`${scenario.name}: finish ${fmtTime(scenarioFinish(scenario.schedule))}`).join(' · ')}`;
+          drawProgressChart();
           initMap();
           update(0);
         })

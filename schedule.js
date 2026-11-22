@@ -17,11 +17,7 @@ function buildSchedule(config,start,totalKm) {
   const sleepBreakDates=new Set();
   const shortBreakMilliseconds=config.shortBreak.rideHours*60*60*1000;
   const sleepStartMinute=config.sleepBreak.startMinute||0;
-  const sleepEndAt=startTime=> {
-    const end=new Date(startTime);
-    end.setMinutes(end.getMinutes()+config.sleepBreak.minutes);
-    return end
-  };
+  const sleepEndAt=startTime=>new Date(startTime.getTime()+config.sleepBreak.minutes*60*1000);
 
   const speedAt=k=> {
     const zone=config.speedZones.find(zone=>k>=zone.fromKm&&(zone.toKm===null||k<zone.toKm));
