@@ -53,15 +53,7 @@
           <ul class="places" id="nextPlaces"></ul>
         </section>
 
-        <section class="card scenario fast">
-          <h2>Snel schema</h2>
-          <div id="fastInfo"></div>
-        </section>
-
-        <section class="card scenario slow">
-          <h2>Langzaam schema</h2>
-          <div id="slowInfo"></div>
-        </section>
+        <div class="scenario-grid full" id="scenarioCards"></div>
 
         <section class="card full">
           <h2>Routekaart</h2>
@@ -142,6 +134,20 @@ function pauseText(p) {
 } function scenarioHTML(sc,k) {
   const prev=[...sc.pauses].reverse().find(p=>p.km<=k&&p.km>=k-10), next=sc.pauses.find(p=>p.km>k&&p.km<=k+10);
   return `<div class="schedule-row"><span>Geplande doorkomst</span><span>${fmtTime(arrival(sc,k))}</span></div><div class="schedule-row"><span>Pauze afgelopen 10 km</span><span>${pauseText(prev)}</span></div><div class="schedule-row"><span>Pauze komende 10 km</span><span>${pauseText(next)}</span></div>`
+} function renderScenarioCards(scenarios) {
+  const container=$('#scenarioCards');
+  container.replaceChildren();
+  for(const scenario of scenarios) {
+    const card=document.createElement('section');
+    card.className='card scenario';
+    card.style.setProperty('--scenario-color',scenario.color);
+    const heading=document.createElement('h2');
+    heading.textContent=scenario.name;
+    const info=document.createElement('div');
+    card.append(heading,info);
+    container.append(card);
+    scenario.infoElement=info
+  }
 } let map,marker;
 function initMap() {
   try {
@@ -274,8 +280,9 @@ function drawProfile() {
   $('#currentPlace').textContent=place.name;
   const next=DATA.places.filter(x=>x.km>k+.01).slice(0,3);
   $('#nextPlaces').innerHTML=next.length?next.map(x=>`<li><span>${x.name} <small>(${x.country})</small></span><strong>over ${fmtKm(x.km-k)}</strong></li>`).join(''):'<li><span>Geen volgende gemeentegrens meer</span><strong>finish</strong></li>';
-  $('#fastInfo').innerHTML=scenarioHTML(DATA.schedules.fast,k);
-  $('#slowInfo').innerHTML=scenarioHTML(DATA.schedules.slow,k);
+  for(const scenario of DATA.scenarios) {
+    scenario.infoElement.innerHTML=scenarioHTML(scenario.schedule,k)
+  }
   updateMap(k,fromMap);
   drawProfile()
 } input.addEventListener('focus',()=>isEditing=true);
@@ -314,38 +321,61 @@ addEventListener('resize',drawProfile);
         })
         .then(json => {
           DATA = json;
+          let scenarios;
           try {
             const storedSettings=localStorage.getItem(SETTINGS_STORAGE_KEY);
             if(storedSettings) {
               const settings=JSON.parse(storedSettings);
-              if(!settings||typeof settings.start!=='string'||
-                 !settings.fast||!Array.isArray(settings.fast.speedZones)||
-                 !settings.slow||!Array.isArray(settings.slow.speedZones)) {
+              if(!settings||typeof settings!=='object') {
                 throw new Error('De opgeslagen schema-instellingen zijn ongeldig.');
               }
-              DATA.schedules.start=settings.start;
-              DATA.schedules.fast.config=settings.fast;
-              DATA.schedules.slow.config=settings.slow;
+              if(typeof settings.start==='string')DATA.schedules.start=settings.start;
+              const defaults=[
+                {id:'fast',name:'Snel schema',color:'#087f5b',config:DATA.schedules.fast.config},
+                {id:'slow',name:'Langzaam schema',color:'#c2410c',config:DATA.schedules.slow.config}
+              ];
+              if(Array.isArray(settings.scenarios)) {
+                const ids=new Set();
+                const valid=settings.scenarios.length>0&&settings.scenarios.every(scenario=>
+                  scenario&&typeof scenario.id==='string'&&scenario.id.length>0&&!ids.has(scenario.id)&&
+                  ids.add(scenario.id)&&typeof scenario.name==='string'&&scenario.name.trim().length>0&&
+                  scenario.name.trim().length<=60&&typeof scenario.color==='string'&&
+                  /^#[0-9a-f]{6}$/i.test(scenario.color)&&scenario.config&&
+                  Array.isArray(scenario.config.speedZones)&&scenario.config.speedZones.length>0
+                );
+                if(!valid)throw new Error('De opgeslagen schema’s zijn ongeldig.');
+                scenarios=settings.scenarios.map(scenario=>({
+                  id:scenario.id,
+                  name:scenario.name.trim(),
+                  color:scenario.color,
+                  config:scenario.config
+                }));
+              } else {
+                scenarios=defaults.map(scenario=>({
+                  ...scenario,
+                  config:settings[scenario.id]&&Array.isArray(settings[scenario.id].speedZones)?
+                    settings[scenario.id]:scenario.config
+                }));
+              }
             } else {
               DATA.schedules.start=localStorage.getItem(LEGACY_START_STORAGE_KEY)||DATA.schedules.start;
+              scenarios=[
+                {id:'fast',name:'Snel schema',color:'#087f5b',config:DATA.schedules.fast.config},
+                {id:'slow',name:'Langzaam schema',color:'#c2410c',config:DATA.schedules.slow.config}
+              ];
             }
           } catch (error) {
             console.error(error);
             throw new Error(error.message||'De schema-instellingen konden niet uit browseropslag worden gelezen.');
           }
-          DATA.schedules.fast = buildSchedule(
-            DATA.schedules.fast.config,
-            DATA.schedules.start,
-            DATA.route[DATA.route.length-1][0]
-          );
-          DATA.schedules.slow = buildSchedule(
-            DATA.schedules.slow.config,
-            DATA.schedules.start,
-            DATA.route[DATA.route.length-1][0]
-          );
+          DATA.scenarios=scenarios.map(scenario=>({
+            ...scenario,
+            schedule:buildSchedule(scenario.config,DATA.schedules.start,DATA.route[DATA.route.length-1][0])
+          }));
+          renderScenarioCards(DATA.scenarios);
           input.max = DATA.total;
           input.value = '0';
-          $('#routeSummary').textContent = `Totale lengte ${fmtKm(routeEnd())} · snelle finish ${fmtTime(scenarioFinish(DATA.schedules.fast))} · langzame finish ${fmtTime(scenarioFinish(DATA.schedules.slow))}`;
+          $('#routeSummary').textContent = `Totale lengte ${fmtKm(routeEnd())} · ${DATA.scenarios.map(scenario=>`${scenario.name}: finish ${fmtTime(scenarioFinish(scenario.schedule))}`).join(' · ')}`;
           initMap();
           update(0);
         })

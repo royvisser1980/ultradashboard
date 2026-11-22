@@ -13,7 +13,7 @@
           <img class="brand-logo" src="borderline700-logo.png" alt="BORDERLINE700-logo">
           <div>
             <h1>Instellingen</h1>
-            <div class="sub">Starttijd en eigenschappen van beide schema's.</div>
+            <div class="sub">Starttijd en eigenschappen van de schema's.</div>
           </div>
         </div>
         <a class="dashboard-link" href="index.html">Terug naar dashboard</a>
@@ -26,6 +26,10 @@
           <input id="startDate" name="startDate" type="datetime-local" step="60" required>
         </section>
 
+        <div class="scenario-toolbar">
+          <h2>Schema's</h2>
+          <button class="button button-secondary" id="addScenario" type="button" disabled>Schema toevoegen</button>
+        </div>
         <div id="scenarioSettings" class="scenario-settings-grid"></div>
         <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
         <div class="form-actions">
@@ -43,10 +47,12 @@
       const scenarioContainer=document.querySelector('#scenarioSettings');
       const status=document.querySelector('#settingsStatus');
       const saveButton=document.querySelector('#saveSettings');
-      const scenarioNames=['fast','slow'];
       const setStatus=message=>{status.textContent=message};
+      const addScenarioButton=document.querySelector('#addScenario');
       let routeTotalKm=0;
       let settingsReady=false;
+      let scenarios=[];
+      let nextScenarioId=1;
 
       function createField(labelText,type,value,fieldName,options={}) {
         const label=document.createElement('label');
@@ -60,6 +66,7 @@
         input.dataset.field=fieldName;
         if(options.min!==undefined)input.min=String(options.min);
         if(options.max!==undefined)input.max=String(options.max);
+        if(options.maxLength!==undefined)input.maxLength=options.maxLength;
         if(options.step!==undefined)input.step=String(options.step);
         if(options.readOnly)input.readOnly=true;
         label.append(caption,input);
@@ -123,17 +130,55 @@
         return row;
       }
 
-      function renderScenario(name,label,config) {
+      function renderScenario(scenario) {
+        const config=scenario.config;
         const card=document.createElement('section');
-        card.className=`card scenario scenario-settings ${name}`;
-        card.dataset.scenario=name;
+        card.className='card scenario scenario-settings';
+        card.dataset.scenario=scenario.id;
+        scenario.card=card;
+        card.style.setProperty('--scenario-color',scenario.color);
+        const headingRow=document.createElement('div');
+        headingRow.className='scenario-settings-heading';
         const heading=document.createElement('h2');
-        heading.textContent=label;
-        card.append(heading);
+        heading.textContent=scenario.name;
+        const actions=document.createElement('div');
+        actions.className='scenario-actions';
+        const moveUp=document.createElement('button');
+        moveUp.type='button';
+        moveUp.className='button button-secondary scenario-move scenario-move-up';
+        moveUp.textContent='↑';
+        moveUp.title='Verplaats omhoog';
+        moveUp.setAttribute('aria-label',`Verplaats ${scenario.name} omhoog`);
+        moveUp.addEventListener('click',()=>moveScenario(scenario,-1));
+        const moveDown=document.createElement('button');
+        moveDown.type='button';
+        moveDown.className='button button-secondary scenario-move scenario-move-down';
+        moveDown.textContent='↓';
+        moveDown.title='Verplaats omlaag';
+        moveDown.setAttribute('aria-label',`Verplaats ${scenario.name} omlaag`);
+        moveDown.addEventListener('click',()=>moveScenario(scenario,1));
+        const removeScenario=document.createElement('button');
+        removeScenario.type='button';
+        removeScenario.className='button button-secondary';
+        removeScenario.textContent='Schema verwijderen';
+        removeScenario.setAttribute('aria-label',`Verwijder schema ${scenario.name}`);
+        removeScenario.addEventListener('click',()=>{
+          if(scenarios.length<=1)return;
+          scenarios=scenarios.filter(item=>item!==scenario);
+          card.remove();
+          updateScenarioButtons();
+          setStatus('');
+          updateFinishPreviews();
+        });
+        actions.append(moveUp,moveDown,removeScenario);
+        headingRow.append(heading,actions);
+        card.append(headingRow);
 
         const fields=document.createElement('div');
         fields.className='settings-fields';
         fields.append(
+          createField('Naam schema','text',scenario.name,'scenarioName',{maxLength:60}).label,
+          createField('Kleur schema','color',scenario.color,'scenarioColor').label,
           createField('Korte stop na (rij-uren)','number',config.shortBreak.rideHours,'shortRideHours',{min:0.25,max:24,step:0.25}).label,
           createField('Duur korte stop (minuten)','number',config.shortBreak.minutes,'shortMinutes',{min:1,max:1439,step:1}).label,
           createField('Avondstop om','time',`${String(config.mealBreak.hour).padStart(2,'0')}:${String(config.mealBreak.minute).padStart(2,'0')}`,'mealTime',{step:60}).label,
@@ -142,6 +187,17 @@
           createField('Duur slaapstop (minuten)','number',config.sleepBreak.minutes,'sleepMinutes',{min:1,max:1439,step:1}).label,
           createField('Geen slaapstop meer als nog (km) resteert','number',config.sleepBreak.minimumRemainingKm,'sleepMinimumRemainingKm',{min:0,max:routeTotalKm,step:0.1}).label
         );
+        fields.querySelector('[data-field="scenarioName"]').addEventListener('input',event=>{
+          scenario.name=event.target.value.trim();
+          heading.textContent=scenario.name||'Naamloos schema';
+          removeScenario.setAttribute('aria-label',`Verwijder schema ${scenario.name||'Naamloos schema'}`);
+          moveUp.setAttribute('aria-label',`Verplaats ${scenario.name||'Naamloos schema'} omhoog`);
+          moveDown.setAttribute('aria-label',`Verplaats ${scenario.name||'Naamloos schema'} omlaag`);
+        });
+        fields.querySelector('[data-field="scenarioColor"]').addEventListener('input',event=>{
+          card.style.setProperty('--scenario-color',event.target.value);
+          scenario.color=event.target.value;
+        });
         card.append(fields);
 
         const zoneHeading=document.createElement('h3');
@@ -169,7 +225,7 @@
           const speed=Number(last.querySelector('[data-field="zoneSpeed"]').value);
           const split=Math.round(((from+to)/2)*1000)/1000;
           if(!Number.isFinite(from)||!Number.isFinite(to)||!Number.isFinite(speed)||split<=from||split>=to) {
-            setStatus(`${label}: het laatste kilometervak is te klein of ongeldig om te splitsen.`);
+            setStatus(`${scenario.name}: het laatste kilometervak is te klein of ongeldig om te splitsen.`);
             return;
           }
           last.querySelector('[data-field="zoneTo"]').value=String(split);
@@ -189,6 +245,43 @@
         finishPreview.append(finishLabel,finishValue);
         card.append(finishPreview);
         return card;
+      }
+
+      function updateScenarioButtons() {
+        scenarios.forEach((scenario,index)=>{
+          const actions=scenario.card.querySelector('.scenario-actions');
+          actions.querySelector('.scenario-move-up').disabled=index===0;
+          actions.querySelector('.scenario-move-down').disabled=index===scenarios.length-1;
+          actions.querySelector('[aria-label^="Verwijder schema"]').disabled=scenarios.length===1;
+        });
+      }
+
+      function moveScenario(scenario,direction) {
+        const from=scenarios.indexOf(scenario);
+        const to=from+direction;
+        if(from<0||to<0||to>=scenarios.length)return;
+        scenarios.splice(from,1);
+        scenarios.splice(to,0,scenario);
+        scenarios.forEach(item=>scenarioContainer.append(item.card));
+        updateScenarioButtons();
+      }
+
+      function addScenario() {
+        if(!settingsReady)return;
+        const source=scenarios[0];
+        const current=readScenarioConfig(source);
+        const config=current.config||source.config;
+        const scenario={
+          id:`scenario-${nextScenarioId++}`,
+          name:`Schema ${scenarios.length+1}`,
+          color:'#0f766e',
+          config:JSON.parse(JSON.stringify(config))
+        };
+        scenarios.push(scenario);
+        scenarioContainer.append(renderScenario(scenario));
+        updateScenarioButtons();
+        setStatus('');
+        updateFinishPreviews();
       }
 
       function isScenarioConfig(config) {
@@ -229,8 +322,17 @@
         return input.value.trim()===''?NaN:Number(input.value);
       }
 
-      function readScenarioConfig(name,label,original) {
-        const card=scenarioContainer.querySelector(`[data-scenario="${name}"]`);
+      function readScenarioConfig(scenario) {
+        const card=scenario.card;
+        const label=card.querySelector('[data-field="scenarioName"]').value.trim()||'Naamloos schema';
+        const name=card.querySelector('[data-field="scenarioName"]').value.trim();
+        const color=card.querySelector('[data-field="scenarioColor"]').value;
+        if(!name||name.length>60)return {error:'Geef ieder schema een naam van maximaal 60 tekens.'};
+        const matchingNames=scenarios.filter(item=>
+          item!==scenario&&item.card.querySelector('[data-field="scenarioName"]').value.trim().toLocaleLowerCase()===name.toLocaleLowerCase()
+        );
+        if(matchingNames.length)return {error:`De naam "${name}" wordt al door een ander schema gebruikt.`};
+        if(!/^#[0-9a-f]{6}$/i.test(color))return {error:`${label}: kies een geldige schema-kleur.`};
         const zoneRows=[...card.querySelectorAll('.speed-zone')];
         if(!zoneRows.length)return {error:`${label}: voeg ten minste één kilometervak toe.`};
         const zones=[];
@@ -289,34 +391,33 @@
         }
 
         return {config:{
-          ...original,
+          ...scenario.config,
           speedZones:zones,
-          shortBreak:{...original.shortBreak,rideHours:shortRideHours,minutes:shortMinutes},
-          mealBreak:{...original.mealBreak,hour:mealTime.hour,minute:mealTime.minute,minutes:mealMinutes},
+          shortBreak:{...scenario.config.shortBreak,rideHours:shortRideHours,minutes:shortMinutes},
+          mealBreak:{...scenario.config.mealBreak,hour:mealTime.hour,minute:mealTime.minute,minutes:mealMinutes},
           sleepBreak:{
-            ...original.sleepBreak,
+            ...scenario.config.sleepBreak,
             startHour:sleepTime.hour,
             startMinute:sleepTime.minute,
             minutes:sleepMinutes,
             minimumRemainingKm:sleepMinimumRemainingKm
           }
-        }};
+        },name,color};
       }
 
       function updateFinishPreviews() {
         if(!settingsReady)return;
         if(!startInput.value||Number.isNaN(new Date(startInput.value).getTime())) {
-          scenarioNames.forEach(name=>{
-            const output=scenarioContainer.querySelector(`[data-scenario="${name}"] [data-finish-time]`);
+          scenarios.forEach(scenario=>{
+            const output=scenario.card.querySelector('[data-finish-time]');
             output.textContent='Vul een geldige starttijd in.';
             output.classList.add('is-invalid');
           });
           return;
         }
-        for(const name of scenarioNames) {
-          const label=name==='fast'?'Snel schema':'Langzaam schema';
-          const output=scenarioContainer.querySelector(`[data-scenario="${name}"] [data-finish-time]`);
-          const result=readScenarioConfig(name,label,currentConfigs[name]);
+        for(const scenario of scenarios) {
+          const output=scenario.card.querySelector('[data-finish-time]');
+          const result=readScenarioConfig(scenario);
           if(result.error) {
             output.textContent=`Niet berekend: ${result.error}`;
             output.classList.add('is-invalid');
@@ -340,6 +441,7 @@
 
       form.addEventListener('input',updateFinishPreviews);
       form.addEventListener('change',updateFinishPreviews);
+      addScenarioButton.addEventListener('click',addScenario);
 
       form.addEventListener('submit',event=>{
         event.preventDefault();
@@ -349,16 +451,20 @@
           startInput.focus();
           return;
         }
-        const saved={start:`${startInput.value}:00`};
-        for(const name of scenarioNames) {
-          const label=name==='fast'?'Snel schema':'Langzaam schema';
-          const result=readScenarioConfig(name,label,currentConfigs[name]);
+        const saved={start:`${startInput.value}:00`,scenarios:[]};
+        for(const scenario of scenarios) {
+          const result=readScenarioConfig(scenario);
           if(result.error) {
             setStatus(result.error);
-            scenarioContainer.querySelector(`[data-scenario="${name}"]`).scrollIntoView({behavior:'smooth',block:'center'});
+            scenario.card.scrollIntoView({behavior:'smooth',block:'center'});
             return;
           }
-          saved[name]=result.config;
+          saved.scenarios.push({
+            id:scenario.id,
+            name:result.name,
+            color:result.color,
+            config:result.config
+          });
         }
         try {
           localStorage.setItem(SETTINGS_STORAGE_KEY,JSON.stringify(saved));
@@ -370,7 +476,6 @@
         window.location.href='index.html';
       });
 
-      let currentConfigs={};
       fetch('data.json')
         .then(response=>{
           if(!response.ok)throw new Error(`Routedata kon niet worden geladen (${response.status})`);
@@ -390,21 +495,47 @@
           } else if(saved&&saved.start) {
             setStatus('De opgeslagen starttijd is ongeldig. Kies een nieuwe starttijd en sla deze op.');
           }
-          for(const name of scenarioNames) {
-            const config=data.schedules[name].config;
-            if(!isScenarioConfig(config))throw new Error(`De standaardinstellingen van het ${name==='fast'?'snelle':'langzame'} schema zijn ongeldig.`);
-            currentConfigs[name]=JSON.parse(JSON.stringify(config));
-            if(saved&&saved[name]) {
-              if(isScenarioConfig(saved[name])) {
-                currentConfigs[name]=JSON.parse(JSON.stringify(saved[name]));
-              } else {
-                setStatus(`De opgeslagen instellingen van het ${name==='fast'?'snelle':'langzame'} schema zijn ongeldig; standaardwaarden worden getoond.`);
-              }
-            }
-            scenarioContainer.append(renderScenario(name,name==='fast'?'Snel schema':'Langzaam schema',currentConfigs[name]));
+          const defaults=[
+            {id:'fast',name:'Snel schema',color:'#087f5b',config:data.schedules.fast.config},
+            {id:'slow',name:'Langzaam schema',color:'#c2410c',config:data.schedules.slow.config}
+          ];
+          if(defaults.some(scenario=>!isScenarioConfig(scenario.config))) {
+            throw new Error('De standaardinstellingen van een schema zijn ongeldig.');
           }
+          if(saved&&Array.isArray(saved.scenarios)) {
+            const savedScenarios=saved.scenarios;
+            const ids=new Set();
+            const valid=savedScenarios.length>0&&savedScenarios.every(scenario=>
+              scenario&&typeof scenario.id==='string'&&scenario.id.length>0&&!ids.has(scenario.id)&&
+              ids.add(scenario.id)&&typeof scenario.name==='string'&&scenario.name.trim().length>0&&
+              scenario.name.trim().length<=60&&typeof scenario.color==='string'&&
+              /^#[0-9a-f]{6}$/i.test(scenario.color)&&isScenarioConfig(scenario.config)
+            );
+            if(valid) {
+              scenarios=savedScenarios.map(scenario=>({
+                id:scenario.id,name:scenario.name.trim(),color:scenario.color,
+                config:JSON.parse(JSON.stringify(scenario.config))
+              }));
+            } else {
+              scenarios=defaults.map(scenario=>({...scenario,config:JSON.parse(JSON.stringify(scenario.config))}));
+              setStatus('De opgeslagen schema’s zijn ongeldig; standaardwaarden worden getoond.');
+            }
+          } else {
+            scenarios=defaults.map(scenario=>{
+              const config=saved&&saved[scenario.id]&&isScenarioConfig(saved[scenario.id])?
+                saved[scenario.id]:scenario.config;
+              return {...scenario,config:JSON.parse(JSON.stringify(config))};
+            });
+          }
+          scenarios.forEach((scenario,index)=>{
+            scenarioContainer.append(renderScenario(scenario));
+            const match=/^scenario-(\d+)$/.exec(scenario.id);
+            if(match)nextScenarioId=Math.max(nextScenarioId,Number(match[1])+1);
+          });
           settingsReady=true;
           saveButton.disabled=false;
+          addScenarioButton.disabled=false;
+          updateScenarioButtons();
           updateFinishPreviews();
         })
         .catch(error=>{
