@@ -250,6 +250,11 @@ function initMap() {
           'line-color':'#234930','line-width':5,'line-opacity':.9
         }
       });
+      map.on('click','route-line',event=>{
+        update(nearestRouteKm(event.lngLat),false,true)
+      });
+      map.on('mouseenter','route-line',()=>{map.getCanvas().style.cursor='pointer'});
+      map.on('mouseleave','route-line',()=>{map.getCanvas().style.cursor=''});
       const dot=document.createElement('div');
       dot.style.width='18px';
       dot.style.height='18px';
