@@ -1,0 +1,50 @@
+{
+  "id": "./index.html",
+  "name": "BORDERLINE700 - Gouda-Luxemburg-Gouda ritdashboard",
+  "short_name": "BORDERLINE700",
+  "description": "Ritdashboard voor de Gouda-Luxemburg-Gouda route.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#234930",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Hotels",
+      "short_name": "Hotels",
+      "url": "./hotels.html",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Schema's",
+      "short_name": "Schema's",
+      "url": "./settings.html",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
