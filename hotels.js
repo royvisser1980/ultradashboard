@@ -141,7 +141,7 @@ function renderHotels() {
   bulkButton.textContent=missingCoordinates===0?
     'Alle coördinaten zijn al bekend':
     `Alle ontbrekende coördinaten ophalen (${missingCoordinates})`;
-  updateHotelImportControls();
+  updateHotelControls();
   for(const hotel of savedHotels) {
     const card=document.createElement('article');
     card.className='hotel-record-card';
@@ -174,12 +174,14 @@ function renderHotels() {
   }
 }
 
-function updateHotelImportControls() {
+function updateHotelControls() {
   const fileInput=$('#hotelWorkbook');
-  const button=$('#importHotels');
+  const importButton=$('#importHotels');
+  const exportButton=$('#exportHotels');
   const busy=hotelImportBusy||nominatimBusy||!hotelDatabase;
   fileInput.disabled=busy;
-  button.disabled=busy||!fileInput.files.length;
+  importButton.disabled=busy||!fileInput.files.length;
+  exportButton.disabled=busy||savedHotels.length===0||typeof XLSX==='undefined';
 }
 
 function initializeHotelMap() {
@@ -428,37 +430,68 @@ function replaceHotelsWithImport(importedHotels) {
   });
 }
 
-function setHotelImportStatus(message) {
-  $('#hotelImportStatus').textContent=message;
+function setHotelFileStatus(message) {
+  $('#hotelFileStatus').textContent=message;
+}
+
+function exportHotelsToWorkbook() {
+  if(hotelImportBusy||nominatimBusy||!hotelDatabase)return;
+  if(savedHotels.length===0) {
+    setHotelFileStatus('Er zijn geen opgeslagen hotels om te exporteren.');
+    return;
+  }
+  try {
+    if(typeof XLSX==='undefined') {
+      throw new Error('De Excel-bibliotheek kon niet worden geladen. Controleer de internetverbinding en probeer het opnieuw.');
+    }
+    const rows=[
+      ['Naam hotel','Adres','Telefoon','Website','Extra info'],
+      ...savedHotels.map(hotel=>[
+        hotel.name||'',
+        hotel.address||'',
+        hotel.phone||'',
+        hotel.website||'',
+        hotel.extraInfo||''
+      ])
+    ];
+    const worksheet=XLSX.utils.aoa_to_sheet(rows);
+    const workbook=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook,worksheet,'Hotels');
+    XLSX.writeFile(workbook,'hotels.xlsx',{bookType:'xlsx'});
+    setHotelFileStatus(`${savedHotels.length} hotels geëxporteerd naar hotels.xlsx.`);
+  } catch(error) {
+    console.error('De hotels konden niet naar Excel worden geëxporteerd.',error);
+    setHotelFileStatus(error.message||'De Excel-export is mislukt.');
+  }
 }
 
 async function importHotelsFromFile() {
   if(hotelImportBusy||nominatimBusy||!hotelDatabase)return;
   const file=$('#hotelWorkbook').files[0];
   if(!file) {
-    setHotelImportStatus('Kies eerst een .xlsx-bestand.');
+    setHotelFileStatus('Kies eerst een .xlsx-bestand.');
     return;
   }
   hotelImportBusy=true;
-  updateHotelImportControls();
+  updateHotelControls();
   renderHotels();
-  setHotelImportStatus('Het bestand wordt in deze browser gecontroleerd en gelezen…');
+  setHotelFileStatus('Het bestand wordt in deze browser gecontroleerd en gelezen…');
   try {
     const importedHotels=await parseHotelWorkbook(file);
     const result=await replaceHotelsWithImport(importedHotels);
     hotelMessages.clear();
     $('#hotelWorkbook').value='';
     await refreshHotels(true);
-    setHotelImportStatus(
+    setHotelFileStatus(
       `${result.hotelCount} hotels geïmporteerd; ${result.preservedCoordinateCount} bestaande coördinatensets behouden.`
     );
     setHotelStatus('De hotelcollectie is volledig vervangen door de Excel-import.');
   } catch(error) {
     console.error('De hotelimport is mislukt.',error);
-    setHotelImportStatus(error.message||'De Excel-import is mislukt. Controleer het bestand en probeer het opnieuw.');
+    setHotelFileStatus(error.message||'De Excel-import is mislukt. Controleer het bestand en probeer het opnieuw.');
   } finally {
     hotelImportBusy=false;
-    updateHotelImportControls();
+    updateHotelControls();
     renderHotels();
   }
 }
@@ -567,8 +600,9 @@ async function geocodeMissingHotels() {
 }
 
 $('#geocodeAllHotels').addEventListener('click',geocodeMissingHotels);
-$('#hotelWorkbook').addEventListener('change',updateHotelImportControls);
+$('#hotelWorkbook').addEventListener('change',updateHotelControls);
 $('#importHotels').addEventListener('click',importHotelsFromFile);
+$('#exportHotels').addEventListener('click',exportHotelsToWorkbook);
 
 initializeDemoHotels().catch(error=>{
   console.error('De demo-hotels konden niet uit IndexedDB worden opgehaald.',error);

@@ -43,11 +43,11 @@
           <p id="hotelBulkProgressText" class="small" role="status" aria-live="polite"></p>
         </div>
         <section class="hotel-import" aria-labelledby="hotelImportHeading">
-          <h3 id="hotelImportHeading">Importeer hotels vanuit Excel</h3>
+          <h3 id="hotelImportHeading">Hotels importeren en exporteren</h3>
           <p class="small">
             Gebruik in het eerste werkblad de eerste rij als kolomkoppen: Naam hotel en Adres zijn verplicht;
             Telefoon, Website en Extra info zijn optioneel. De import vervangt alle hotels, maar behoudt coördinaten
-            bij een overeenkomend adres. Het bestand wordt alleen in deze browser gelezen.
+            bij een overeenkomend adres. Een export bevat de huidige hotelgegevens uit deze browser.
           </p>
           <div class="hotel-import-controls">
             <label for="hotelWorkbook">Excelbestand (.xlsx)</label>
@@ -56,11 +56,11 @@
             <button id="importHotels" class="button button-secondary" type="button" disabled>
               Importeer en vervang hotels
             </button>
-            <a class="button button-secondary" href="demo-hotels.xlsx" download>
-              Download demo-Excelbestand
-            </a>
+            <button id="exportHotels" class="button button-secondary" type="button" disabled>
+              Download huidige hotels als Excel
+            </button>
           </div>
-          <p id="hotelImportStatus" class="small" role="status" aria-live="polite"></p>
+          <p id="hotelFileStatus" class="small" role="status" aria-live="polite"></p>
         </section>
         <div id="hotelList" class="hotel-list"></div>
         <p class="small">
