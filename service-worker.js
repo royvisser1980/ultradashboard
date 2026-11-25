@@ -1,4 +1,4 @@
-const CACHE_NAME='ultradashboard-pwa-v3';
+const CACHE_NAME='ultradashboard-pwa-v4';
 const APP_SHELL=[
   './index.html',
   './accommodations.html',
@@ -10,7 +10,7 @@ const APP_SHELL=[
   './settings.js?v=1',
   './schedule.js?v=2',
   './accommodation-map.js?v=4',
-  './accommodations.js?v=4',
+  './accommodations.js?v=5',
   './pwa.js?v=1',
   './data.json',
   './borderline700-logo.png',

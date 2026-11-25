@@ -44,8 +44,10 @@
         <h2 id="hotelImportHeading">Accommodaties importeren en exporteren</h2>
         <p class="small">
           Gebruik in het eerste werkblad de eerste rij als kolomkoppen: Naam accommodatie en Adres zijn verplicht;
-          Telefoon, Website en Extra info zijn optioneel. De import vervangt alle accommodaties, maar behoudt coördinaten
-          bij een overeenkomend adres. Een export bevat de huidige accommodatiegegevens uit deze browser.
+          Telefoon, Website, Extra info, Latitude en Longitude zijn optioneel. Vul Latitude en Longitude samen in
+          (Latitude: -90 t/m 90; Longitude: -180 t/m 180) of laat beide leeg. De import vervangt alle accommodaties;
+          coördinaten uit Excel worden overgenomen en anders behouden bij een overeenkomend adres. Een export bevat de
+          huidige accommodatiegegevens en bekende coördinaten uit deze browser.
         </p>
         <div class="hotel-import-controls">
           <label for="hotelWorkbook">Excelbestand (.xlsx)</label>
@@ -116,7 +118,7 @@
     <script src="dashboard-common.js?v=1"></script>
     <script src="accommodation-data.js?v=1"></script>
     <script src="accommodation-map.js?v=4"></script>
-    <script src="accommodations.js?v=4"></script>
+    <script src="accommodations.js?v=5"></script>
     <script src="pwa.js?v=1"></script>
   </body>
 </html>

@@ -433,12 +433,29 @@ function getHotelImportColumns(headerRow) {
     address:findColumn(['adres']),
     phone:findColumn(['telefoon','telefoonnummer']),
     website:findColumn(['website','link website','link naar website','link naar de website']),
-    extraInfo:findColumn(['extra info','extra informatie'])
+    extraInfo:findColumn(['extra info','extra informatie']),
+    latitude:findColumn(['latitude','breedtegraad','lat']),
+    longitude:findColumn(['longitude','lengtegraad','lon','lng'])
   };
   if(columns.name<0||columns.address<0) {
     throw new Error('De eerste rij moet de kolommen "Naam accommodatie" en "Adres" bevatten.');
   }
+  if((columns.latitude<0)!==(columns.longitude<0)) {
+    throw new Error('Gebruik de kolommen "Latitude" en "Longitude" samen, of laat beide weg.');
+  }
   return columns;
+}
+
+function parseImportedCoordinate(value,field,minimum,maximum,rowNumber) {
+  const text=spreadsheetText(value).replace(/\s/g,'').replace(',','.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+    throw new Error(`Rij ${rowNumber}: "${field}" moet een getal tussen ${minimum} en ${maximum} zijn.`);
+  }
+  const coordinate=Number(text);
+  if(!Number.isFinite(coordinate)||coordinate<minimum||coordinate>maximum) {
+    throw new Error(`Rij ${rowNumber}: "${field}" moet een getal tussen ${minimum} en ${maximum} zijn.`);
+  }
+  return coordinate;
 }
 
 async function parseHotelWorkbook(file) {
@@ -490,12 +507,26 @@ async function parseHotelWorkbook(file) {
   for(let index=1;index<rows.length;index++) {
     const row=rows[index];
     if(row.every(value=>spreadsheetText(value)===''))continue;
+    let latitude=null,longitude=null;
+    if(columns.latitude>=0) {
+      const latitudeValue=spreadsheetText(row[columns.latitude]);
+      const longitudeValue=spreadsheetText(row[columns.longitude]);
+      if(Boolean(latitudeValue)!==Boolean(longitudeValue)) {
+        throw new Error(`Rij ${index+1}: vul Latitude en Longitude beide in of laat ze allebei leeg.`);
+      }
+      if(latitudeValue&&longitudeValue) {
+        latitude=parseImportedCoordinate(row[columns.latitude],'Latitude',-90,90,index+1);
+        longitude=parseImportedCoordinate(row[columns.longitude],'Longitude',-180,180,index+1);
+      }
+    }
     const hotel={
       name:spreadsheetText(row[columns.name]),
       address:spreadsheetText(row[columns.address]),
       phone:columns.phone<0?'':spreadsheetText(row[columns.phone]),
       website:columns.website<0?'':spreadsheetText(row[columns.website]),
-      extraInfo:columns.extraInfo<0?'':spreadsheetText(row[columns.extraInfo])
+      extraInfo:columns.extraInfo<0?'':spreadsheetText(row[columns.extraInfo]),
+      latitude,
+      longitude
     };
     if(!hotel.name||!hotel.address) {
       throw new Error(`Rij ${index+1}: vul zowel "Naam accommodatie" als "Adres" in.`);
@@ -532,17 +563,20 @@ function replaceHotelsWithImport(importedHotels) {
             existingByAddress.set(address,hotel);
           }
         }
-        let preservedCoordinateCount=0;
+        let importedCoordinateCount=0,preservedCoordinateCount=0;
+        const importedAt=new Date().toISOString();
         const replacementHotels=importedHotels.map(hotel=>{
           const existing=existingByAddress.get(normalizeAddress(hotel.address));
-          if(existing)preservedCoordinateCount++;
+          const importedCoordinates=AccommodationData.getCoordinates(hotel);
+          if(importedCoordinates)importedCoordinateCount++;
+          else if(existing)preservedCoordinateCount++;
           return {
             id:createImportedHotelId(),
             ...hotel,
-            latitude:existing?existing.latitude:null,
-            longitude:existing?existing.longitude:null,
-            geocodedAt:existing?existing.geocodedAt:null,
-            geocoder:existing?existing.geocoder:null
+            latitude:importedCoordinates?importedCoordinates.latitude:existing?existing.latitude:null,
+            longitude:importedCoordinates?importedCoordinates.longitude:existing?existing.longitude:null,
+            geocodedAt:importedCoordinates?importedAt:existing?existing.geocodedAt:null,
+            geocoder:importedCoordinates?'Excel import':existing?existing.geocoder:null
           };
         });
         hotelStore.clear();
@@ -554,6 +588,7 @@ function replaceHotelsWithImport(importedHotels) {
         });
         importedResult={
           hotelCount:replacementHotels.length,
+          importedCoordinateCount,
           preservedCoordinateCount
         };
       } catch(error) {
@@ -582,14 +617,19 @@ function exportHotelsToWorkbook() {
       throw new Error('De Excel-bibliotheek kon niet worden geladen. Controleer de internetverbinding en probeer het opnieuw.');
     }
     const rows=[
-      ['Naam accommodatie','Adres','Telefoon','Website','Extra info'],
-      ...savedHotels.map(hotel=>[
-        hotel.name||'',
-        hotel.address||'',
-        hotel.phone||'',
-        hotel.website||'',
-        hotel.extraInfo||''
-      ])
+      ['Naam accommodatie','Adres','Telefoon','Website','Extra info','Latitude','Longitude'],
+      ...savedHotels.map(hotel=>{
+        const coordinates=AccommodationData.getCoordinates(hotel);
+        return [
+          hotel.name||'',
+          hotel.address||'',
+          hotel.phone||'',
+          hotel.website||'',
+          hotel.extraInfo||'',
+          coordinates?coordinates.latitude:'',
+          coordinates?coordinates.longitude:''
+        ];
+      })
     ];
     const worksheet=XLSX.utils.aoa_to_sheet(rows);
     const workbook=XLSX.utils.book_new();
@@ -622,7 +662,7 @@ async function importHotelsFromFile() {
     $('#hotelWorkbook').value='';
     await refreshHotels(true);
     setHotelFileStatus(
-      `${result.hotelCount} accommodaties geïmporteerd; ${result.preservedCoordinateCount} bestaande coördinatensets behouden.`
+      `${result.hotelCount} accommodaties geïmporteerd; ${result.importedCoordinateCount} coördinatensets uit Excel overgenomen en ${result.preservedCoordinateCount} bestaande sets op adres behouden.`
     );
     setHotelStatus('De collectie accommodaties is volledig vervangen door de Excel-import.');
   } catch(error) {
