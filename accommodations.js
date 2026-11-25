@@ -1,9 +1,6 @@
-const HOTEL_DB_NAME='ultradashboard.hotels';
-const HOTEL_DB_VERSION=2;
-const HOTEL_STORE_NAME='hotels';
-const HOTEL_METADATA_STORE_NAME='metadata';
 const HOTEL_IMPORT_MARKER_KEY='hotel-workbook-imported';
-const SETTINGS_STORAGE_KEY='ultradashboard.settings';
+const HOTEL_STORE_NAME=AccommodationData.STORE_NAME;
+const HOTEL_METADATA_STORE_NAME=AccommodationData.METADATA_STORE_NAME;
 const DEFAULT_HOTEL_RADIUS_KM=10;
 const NOMINATIM_REQUEST_INTERVAL_MS=1500;
 const MAX_HOTEL_IMPORT_FILE_SIZE=5*1024*1024;
@@ -46,21 +43,7 @@ const hotelMessages=new Map();
 const $=selector=>document.querySelector(selector);
 
 function openHotelDatabase() {
-  return new Promise((resolve,reject)=>{
-    const request=indexedDB.open(HOTEL_DB_NAME,HOTEL_DB_VERSION);
-    request.onupgradeneeded=()=>{
-      const database=request.result;
-      if(!database.objectStoreNames.contains(HOTEL_STORE_NAME)) {
-        database.createObjectStore(HOTEL_STORE_NAME,{keyPath:'id'});
-      }
-      if(!database.objectStoreNames.contains(HOTEL_METADATA_STORE_NAME)) {
-        database.createObjectStore(HOTEL_METADATA_STORE_NAME,{keyPath:'key'});
-      }
-    };
-    request.onsuccess=()=>resolve(request.result);
-    request.onerror=()=>reject(request.error||new Error('De opslag van accommodaties kon niet worden geopend.'));
-    request.onblocked=()=>reject(new Error('De opslag van accommodaties wordt geblokkeerd door een ander browsertabblad.'));
-  });
+  return AccommodationData.openDatabase(AccommodationData.DATABASE_VERSION);
 }
 
 function setHotelRadiusStatus(message) {
@@ -70,7 +53,7 @@ function setHotelRadiusStatus(message) {
 function loadHotelRadiusSetting() {
   const input=$('#hotelRadiusKm');
   try {
-    const raw=localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const raw=localStorage.getItem(DashboardCommon.SETTINGS_STORAGE_KEY);
     if(!raw) {
       input.value=String(DEFAULT_HOTEL_RADIUS_KM);
       return;
@@ -104,14 +87,14 @@ function saveHotelRadiusSetting(event) {
     return;
   }
   try {
-    const raw=localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const raw=localStorage.getItem(DashboardCommon.SETTINGS_STORAGE_KEY);
     const settings=raw?JSON.parse(raw):{};
     if(!settings||typeof settings!=='object'||Array.isArray(settings)) {
       throw new Error('De opgeslagen instellingen zijn ongeldig.');
     }
     const radius=Number(input.value);
     settings.hotelRadiusKm=radius;
-    localStorage.setItem(SETTINGS_STORAGE_KEY,JSON.stringify(settings));
+    localStorage.setItem(DashboardCommon.SETTINGS_STORAGE_KEY,JSON.stringify(settings));
     const formattedRadius=new Intl.NumberFormat('nl-NL',{maximumFractionDigits:1}).format(radius);
     setHotelRadiusStatus(`Zoekstraal opgeslagen: ${formattedRadius} km.`);
   } catch(error) {
@@ -131,13 +114,7 @@ function readHotel(id) {
 }
 
 function readAllHotels() {
-  return new Promise((resolve,reject)=>{
-    const transaction=hotelDatabase.transaction(HOTEL_STORE_NAME,'readonly');
-    const request=transaction.objectStore(HOTEL_STORE_NAME).getAll();
-    request.onsuccess=()=>resolve(request.result||[]);
-    request.onerror=()=>reject(request.error||new Error('De accommodaties konden niet uit browseropslag worden gelezen.'));
-    transaction.onabort=()=>reject(transaction.error||new Error('Het ophalen van de accommodaties is afgebroken.'));
-  });
+  return AccommodationData.readAllHotels(hotelDatabase);
 }
 
 function writeHotel(hotel) {
@@ -161,8 +138,7 @@ function readHotelImportMarker() {
 }
 
 function hasCoordinates(hotel) {
-  return Number.isFinite(hotel.latitude)&&Number.isFinite(hotel.longitude)&&
-    Math.abs(hotel.latitude)<=90&&Math.abs(hotel.longitude)<=180;
+  return AccommodationData.hasCoordinates(hotel);
 }
 
 function appendValue(element,value,href=null) {

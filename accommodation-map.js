@@ -17,15 +17,12 @@
 
   function toFeatures(hotels) {
     return hotels.flatMap(hotel=>{
-      if(hotel.longitude===null||hotel.longitude===undefined||hotel.longitude===''||
-         hotel.latitude===null||hotel.latitude===undefined||hotel.latitude==='')return [];
-      const longitude=Number(hotel.longitude),latitude=Number(hotel.latitude);
-      if(!Number.isFinite(longitude)||!Number.isFinite(latitude)||
-         Math.abs(longitude)>180||Math.abs(latitude)>90)return [];
+      const coordinates=AccommodationData.getCoordinates(hotel);
+      if(!coordinates)return [];
       return [{
         type:'Feature',
         id:hotel.id,
-        geometry:{type:'Point',coordinates:[longitude,latitude]},
+        geometry:{type:'Point',coordinates:[coordinates.longitude,coordinates.latitude]},
         properties:{
           name:typeof hotel.name==='string'?hotel.name:'',
           address:typeof hotel.address==='string'?hotel.address:'',
