@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Hotels - BORDERLINE700</title>
+    <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+      integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT"
+      crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div class="brand">
+          <img class="brand-logo" src="borderline700-logo.png" alt="BORDERLINE700-logo">
+          <div>
+            <h1>Hotels</h1>
+            <div class="sub">Opgeslagen hotels uit de lokale browseropslag.</div>
+          </div>
+        </div>
+        <nav class="hotel-navigation" aria-label="Navigatie">
+          <a class="button button-secondary" href="settings.html">Instellingen</a>
+          <a class="button button-secondary" href="index.html">Dashboard</a>
+        </nav>
+      </header>
+
+      <section class="card hotel-demo" aria-labelledby="hotelHeading">
+        <h2 id="hotelHeading">Opgeslagen hotels</h2>
+        <p id="hotelStatus" class="small" role="status" aria-live="polite">
+          Hotelgegevens worden uit IndexedDB geladen.
+        </p>
+        <div class="hotel-bulk-actions">
+          <button id="geocodeAllHotels" class="button button-secondary" type="button" disabled>
+            Alle ontbrekende coördinaten ophalen
+          </button>
+        </div>
+        <div id="hotelBulkProgress" class="hotel-bulk-progress" hidden>
+          <label for="hotelBulkProgressBar">Voortgang geocodering</label>
+          <progress id="hotelBulkProgressBar" value="0" max="1"></progress>
+          <p id="hotelBulkProgressText" class="small" role="status" aria-live="polite"></p>
+        </div>
+        <section class="hotel-import" aria-labelledby="hotelImportHeading">
+          <h3 id="hotelImportHeading">Importeer hotels vanuit Excel</h3>
+          <p class="small">
+            Gebruik in het eerste werkblad de eerste rij als kolomkoppen: Naam hotel en Adres zijn verplicht;
+            Telefoon, Website en Extra info zijn optioneel. De import vervangt alle hotels, maar behoudt coördinaten
+            bij een overeenkomend adres. Het bestand wordt alleen in deze browser gelezen.
+          </p>
+          <div class="hotel-import-controls">
+            <label for="hotelWorkbook">Excelbestand (.xlsx)</label>
+            <input id="hotelWorkbook" type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled>
+            <button id="importHotels" class="button button-secondary" type="button" disabled>
+              Importeer en vervang hotels
+            </button>
+            <a class="button button-secondary" href="demo-hotels.xlsx" download>
+              Download demo-Excelbestand
+            </a>
+          </div>
+          <p id="hotelImportStatus" class="small" role="status" aria-live="polite"></p>
+        </section>
+        <div id="hotelList" class="hotel-list"></div>
+        <p class="small">
+          Bij geocodering wordt het adres naar
+          <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer">Nominatim</a>
+          gestuurd. Er wordt maximaal één verzoek per 1,5 seconde verstuurd; resultaten worden lokaal bewaard.
+          Geocodering: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.
+          Zie ook het <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noopener noreferrer">Nominatim-gebruikersbeleid</a>.
+        </p>
+      </section>
+
+      <section class="card hotel-map-card" aria-labelledby="hotelMapHeading">
+        <h2 id="hotelMapHeading">Hotels op de kaart</h2>
+        <div id="hotelMap" role="region" aria-label="Kaart met opgeslagen hotels"></div>
+        <label class="hotel-map-toggle" for="showHotels">
+          <input id="showHotels" type="checkbox" checked>
+          Toon hotels op de kaart
+        </label>
+        <p id="hotelMapStatus" class="small" role="status" aria-live="polite">
+          Opgeslagen hotelcoördinaten worden geladen.
+        </p>
+        <p id="hotelMapWarn" class="warn"></p>
+      </section>
+    </main>
+    <script src="hotel-map.js"></script>
+    <script src="hotels.js"></script>
+  </body>
+</html>

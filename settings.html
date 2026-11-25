@@ -16,6 +16,7 @@
             <div class="sub">Starttijd en eigenschappen van de schema's.</div>
           </div>
         </div>
+        <a class="button button-secondary" href="hotels.html">Hotels</a>
       </header>
 
       <form id="settingsForm" novalidate>
@@ -23,6 +24,15 @@
           <h2>Startdatum en -tijd</h2>
           <label class="settings-field" for="startDate">Startdatum en -tijd</label>
           <input id="startDate" name="startDate" type="datetime-local" step="60" required>
+        </section>
+
+        <section class="card settings-card settings-hotel-card">
+          <h2>Hotels in de buurt</h2>
+          <label class="settings-field" for="hotelRadiusKm">
+            <span>Zoekstraal hotels (km)</span>
+            <input id="hotelRadiusKm" name="hotelRadiusKm" type="number" min="0" step="0.1" required>
+          </label>
+          <p class="settings-help">De straal wordt hemelsbreed gemeten vanaf het geselecteerde routepunt.</p>
         </section>
 
         <div class="scenario-toolbar">
@@ -43,9 +53,11 @@
       const LEGACY_START_STORAGE_KEY='ultradashboard.startTime';
       const form=document.querySelector('#settingsForm');
       const startInput=document.querySelector('#startDate');
+      const hotelRadiusInput=document.querySelector('#hotelRadiusKm');
       const scenarioContainer=document.querySelector('#scenarioSettings');
       const status=document.querySelector('#settingsStatus');
       const saveButton=document.querySelector('#saveSettings');
+      const DEFAULT_HOTEL_RADIUS_KM=10;
       const setStatus=message=>{status.textContent=message};
       const addScenarioButton=document.querySelector('#addScenario');
       let routeTotalKm=0;
@@ -450,7 +462,13 @@
           startInput.focus();
           return;
         }
-        const saved={start:`${startInput.value}:00`,scenarios:[]};
+        if(!hotelRadiusInput.value.trim()||!hotelRadiusInput.checkValidity()) {
+          setStatus('Vul een geldige hotelstraal van 0 km of meer in.');
+          hotelRadiusInput.focus();
+          return;
+        }
+        const hotelRadiusKm=Number(hotelRadiusInput.value);
+        const saved={start:`${startInput.value}:00`,hotelRadiusKm,scenarios:[]};
         for(const scenario of scenarios) {
           const result=readScenarioConfig(scenario);
           if(result.error) {
@@ -493,6 +511,17 @@
             startInput.value=saved.start.slice(0,16);
           } else if(saved&&saved.start) {
             setStatus('De opgeslagen starttijd is ongeldig. Kies een nieuwe starttijd en sla deze op.');
+          }
+          if(saved&&saved.hotelRadiusKm!==undefined) {
+            if(typeof saved.hotelRadiusKm==='number'&&
+               Number.isFinite(saved.hotelRadiusKm)&&saved.hotelRadiusKm>=0) {
+              hotelRadiusInput.value=String(saved.hotelRadiusKm);
+            } else {
+              hotelRadiusInput.value=String(DEFAULT_HOTEL_RADIUS_KM);
+              setStatus('De opgeslagen hotelstraal is ongeldig; 10 km wordt gebruikt.');
+            }
+          } else {
+            hotelRadiusInput.value=String(DEFAULT_HOTEL_RADIUS_KM);
           }
           const defaults=[
             {id:'fast',name:'Snel schema',color:'#087f5b',config:data.schedules.fast.config},

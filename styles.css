@@ -7,6 +7,7 @@
 .dashboard-link,.button-secondary{background:#fff;color:var(--ink)}
 .settings-card{max-width:none}
 .settings-start-card{max-width:620px}
+.settings-hotel-card{max-width:620px}
 .settings-field{display:block;margin-bottom:7px;font-weight:600}
 .settings-field span{display:block}
 .settings-field input{width:100%;padding:11px 12px;border:1px solid #bac9c2;border-radius:9px;font:inherit}
@@ -58,3 +59,43 @@
 .collapsible-card.is-collapsed .collapsible-heading{margin-bottom:0}
 .collapsible-card.is-collapsed .card-toggle-icon{transform:rotate(-90deg)}
 .collapsible-content[hidden]{display:none}
+.nearby-hotels-card .collapsible-heading{margin-bottom:8px}
+.nearby-hotels-description{margin:0 0 12px;color:var(--muted);font-size:13px}
+.nearby-hotels-list{margin:0;padding:0;list-style:none}
+.nearby-hotels-list li{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:9px 0;border-top:1px solid #edf1ef}
+.nearby-hotels-list li>div{display:grid;min-width:0;gap:3px}
+.nearby-hotels-list a{color:#234930;overflow-wrap:anywhere}
+.nearby-hotel-extra-info{color:var(--muted)}
+.nearby-hotel-distance{font-weight:650;white-space:nowrap}
+.hotel-demo{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f6f9f8}
+.hotel-demo h3{margin:0 0 6px;font-size:15px}
+.hotel-demo p{margin:8px 0}
+.hotel-demo .button{margin-top:4px}
+.hotel-demo a{color:#234930}
+.hotel-navigation{display:flex;flex-wrap:wrap;gap:8px}
+.hotel-bulk-actions{margin:8px 0}
+.hotel-bulk-progress{margin:12px 0}
+.hotel-bulk-progress progress{display:block;width:100%;height:14px;margin-top:6px;accent-color:var(--accent)}
+.hotel-bulk-progress p{margin:8px 0}
+.hotel-import{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.hotel-import h3{margin:0 0 6px;font-size:16px}
+.hotel-import p{margin:8px 0}
+.hotel-import-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.hotel-import-controls input[type=file]{min-width:min(100%,260px);max-width:100%}
+.hotel-import-controls label{font-weight:600}
+.hotel-import-controls .button{margin:0}
+.hotel-import #hotelImportStatus{min-height:1em}
+.hotel-list{display:grid;gap:12px}
+.hotel-record-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.hotel-record-card h3{margin:0 0 10px;font-size:16px}
+.hotel-record-card .hotel-record{margin-bottom:12px}
+.hotel-record-card .hotel-status{margin:8px 0;color:var(--muted)}
+.hotel-record{display:grid;gap:12px;margin:0 0 16px}
+.hotel-record>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px}
+.hotel-record dt{font-weight:600;color:var(--muted)}
+.hotel-record dd{margin:0;overflow-wrap:anywhere}
+#hotelMap{height:470px;border-radius:12px;overflow:hidden}
+.hotel-map-toggle{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:600;cursor:pointer}
+.hotel-map-toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.hotel-map-card .warn{display:none}
+@media(max-width:520px){.hotel-record>div{grid-template-columns:1fr;gap:2px}}
