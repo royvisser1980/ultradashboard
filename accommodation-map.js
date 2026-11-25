@@ -1,5 +1,5 @@
 (function(global) {
-  function safeHotelWebsite(value) {
+  function safeAccommodationWebsite(value) {
     if(typeof value!=='string')return null;
     try {
       const url=new URL(value,location.href);
@@ -9,7 +9,7 @@
     }
   }
 
-  function safeHotelPhone(value) {
+  function safeAccommodationPhone(value) {
     if(typeof value!=='string')return null;
     const phone=value.trim().replace(/\s*\(0\)/g,'').replace(/[^\d+]/g,'');
     return /^\+[1-9]\d{6,14}$/.test(phone)?`tel:${phone}`:null;
@@ -40,12 +40,12 @@
   function popupContent(hotel) {
     const content=document.createElement('div');
     const name=document.createElement('strong');
-    name.textContent=hotel.name||'Hotel';
+    name.textContent=hotel.name||'Accommodatie';
     const address=document.createElement('p');
     address.textContent=hotel.address;
     content.append(name,address);
 
-    const phoneUrl=safeHotelPhone(hotel.phone);
+    const phoneUrl=safeAccommodationPhone(hotel.phone);
     if(phoneUrl) {
       const phone=document.createElement('p');
       const link=document.createElement('a');
@@ -59,7 +59,7 @@
       extraInfo.textContent=hotel.extraInfo;
       content.append(extraInfo);
     }
-    const websiteUrl=safeHotelWebsite(hotel.website);
+    const websiteUrl=safeAccommodationWebsite(hotel.website);
     if(websiteUrl) {
       const link=document.createElement('a');
       link.href=websiteUrl;
@@ -92,8 +92,8 @@
       map.getSource(sourceId).setData({type:'FeatureCollection',features});
       setVisibility();
       status.textContent=features.length===0?
-        'Er zijn nog geen opgeslagen hotels met geldige coördinaten.':
-        `${features.length} ${features.length===1?'hotel':'hotels'} met coördinaten op de kaart.`;
+        'Er zijn nog geen opgeslagen accommodaties met geldige coördinaten.':
+        `${features.length} ${features.length===1?'accommodatie':'accommodaties'} met coördinaten op de kaart.`;
       if(!fitToHotels)return;
       const locations=[...new Map(features.map(feature=>[
         feature.geometry.coordinates.join(','),
@@ -122,9 +122,9 @@
     return {setHotels,setVisibility};
   }
 
-  global.HotelMapLayer={
+  global.AccommodationMapLayer={
     create,
-    safeHotelPhone,
-    safeHotelWebsite
+    safeAccommodationPhone,
+    safeAccommodationWebsite
   };
 })(window);

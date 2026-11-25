@@ -9,7 +9,7 @@
     <title>BORDERLINE700 - Gouda-Luxemburg-Gouda ritdashboard</title>
 
     <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
-    <link href="styles.css?v=2" rel="stylesheet">
+    <link href="styles.css?v=6" rel="stylesheet">
     <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
   </head>
   <body>
@@ -31,7 +31,7 @@
           </label>
           <nav class="header-navigation" aria-label="Navigatie">
             <a class="settings-link" href="settings.html">Schema's</a>
-            <a class="settings-link" href="hotels.html">Hotels</a>
+            <a class="settings-link" href="accommodations.html">Accommodaties</a>
           </nav>
         </div>
       </div>
@@ -61,18 +61,18 @@
         <section class="card full collapsible-card nearby-hotels-card" data-card-id="nearbyHotels">
           <h2 class="collapsible-heading">
             <button class="card-toggle" type="button" aria-expanded="true" aria-controls="nearbyHotelsContent">
-              <span id="nearbyHotelsHeading">Hotels binnen 10 km</span>
+              <span id="nearbyHotelsHeading">Accommodaties binnen 10 km</span>
               <span class="card-toggle-icon" aria-hidden="true">▾</span>
             </button>
           </h2>
           <p class="nearby-hotels-description">
-            Toont hotels met opgeslagen coördinaten die hemelsbreed binnen de ingestelde straal van het geselecteerde routepunt liggen.
-            Pas de straal aan via Hotels.
+            Toont accommodaties met opgeslagen coördinaten die hemelsbreed binnen de ingestelde straal van het geselecteerde routepunt liggen.
+            Pas de straal aan via Accommodaties.
           </p>
           <div class="collapsible-content" id="nearbyHotelsContent">
             <ul id="nearbyHotelsList" class="nearby-hotels-list"></ul>
             <p id="nearbyHotelsStatus" class="small" role="status" aria-live="polite">
-              Hotelgegevens worden geladen.
+              Accommodatiegegevens worden geladen.
             </p>
           </div>
         </section>
@@ -90,10 +90,10 @@
             </div>
             <label class="hotel-map-toggle" for="showDashboardHotels">
               <input id="showDashboardHotels" type="checkbox" checked>
-              Toon hotels op de kaart
+              Toon accommodaties op de kaart
             </label>
             <p id="dashboardHotelStatus" class="small" role="status" aria-live="polite">
-              Opgeslagen hotelcoördinaten worden geladen.
+              Opgeslagen accommodatiecoördinaten worden geladen.
             </p>
             <p class="small">
               Geocodering: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
@@ -134,7 +134,7 @@
         </section>
       </div>
     </div>
-    <script src="hotel-map.js?v=2"></script>
+    <script src="accommodation-map.js?v=3"></script>
     <script src="schedule.js?v=2"></script>
     <script src="pwa.js?v=1"></script>
     <script>
@@ -283,27 +283,27 @@ function readStoredHotels() {
         database.createObjectStore(HOTEL_STORE_NAME,{keyPath:'id'});
       }
     };
-    request.onerror=()=>reject(request.error||new Error('De hotelopslag kon niet worden geopend.'));
-    request.onblocked=()=>reject(new Error('De hotelopslag wordt geblokkeerd door een ander browsertabblad.'));
+    request.onerror=()=>reject(request.error||new Error('De opslag van accommodaties kon niet worden geopend.'));
+    request.onblocked=()=>reject(new Error('De opslag van accommodaties wordt geblokkeerd door een ander browsertabblad.'));
     request.onsuccess=()=>{
       const database=request.result;
       if(!database.objectStoreNames.contains(HOTEL_STORE_NAME)) {
         database.close();
-        reject(new Error('De hotelopslag bevat geen hotelgegevens.'));
+        reject(new Error('De opslag bevat geen accommodatiegegevens.'));
         return;
       }
       const transaction=database.transaction(HOTEL_STORE_NAME,'readonly');
       const readRequest=transaction.objectStore(HOTEL_STORE_NAME).getAll();
       let hotels=[];
       readRequest.onsuccess=()=>{hotels=readRequest.result||[]};
-      readRequest.onerror=()=>reject(readRequest.error||new Error('De hotels konden niet worden gelezen.'));
+      readRequest.onerror=()=>reject(readRequest.error||new Error('De accommodaties konden niet worden gelezen.'));
       transaction.oncomplete=()=>{
         database.close();
         resolve(hotels);
       };
       transaction.onabort=()=>{
         database.close();
-        reject(transaction.error||new Error('Het ophalen van de hotels is afgebroken.'));
+        reject(transaction.error||new Error('Het ophalen van de accommodaties is afgebroken.'));
       };
     };
   });
@@ -328,16 +328,16 @@ function distanceBetweenCoordinatesKm(first,second) {
 }
 function renderNearbyHotels(routePoint) {
   const radiusText=new Intl.NumberFormat('nl-NL',{maximumFractionDigits:1}).format(hotelRadiusKm);
-  $('#nearbyHotelsHeading').textContent=`Hotels binnen ${radiusText} km`;
+  $('#nearbyHotelsHeading').textContent=`Accommodaties binnen ${radiusText} km`;
   const list=$('#nearbyHotelsList');
   const status=$('#nearbyHotelsStatus');
   list.replaceChildren();
   if(hotelDataError) {
-    status.textContent=`Hotelgegevens niet beschikbaar: ${hotelDataError}`;
+    status.textContent=`Accommodatiegegevens niet beschikbaar: ${hotelDataError}`;
     return;
   }
   if(!hotelDataLoaded) {
-    status.textContent='Hotelgegevens worden geladen.';
+    status.textContent='Accommodatiegegevens worden geladen.';
     return;
   }
   const locatedHotels=storedHotels.map(hotel=>({
@@ -346,8 +346,8 @@ function renderNearbyHotels(routePoint) {
   })).filter(item=>item.coordinates);
   if(locatedHotels.length===0) {
     status.textContent=storedHotels.length===0?
-      'Er zijn geen hotels opgeslagen.':
-      'Geen opgeslagen hotels met geldige coördinaten.';
+      'Er zijn geen accommodaties opgeslagen.':
+      'Geen opgeslagen accommodaties met geldige coördinaten.';
     return;
   }
   const nearbyHotels=locatedHotels.map(item=>({
@@ -359,20 +359,20 @@ function renderNearbyHotels(routePoint) {
   })).filter(item=>item.distance<=hotelRadiusKm)
     .sort((first,second)=>first.distance-second.distance);
   if(nearbyHotels.length===0) {
-    status.textContent=`Geen hotels binnen ${radiusText} km van het geselecteerde routepunt.`;
+    status.textContent=`Geen accommodaties binnen ${radiusText} km van het geselecteerde routepunt.`;
     return;
   }
   for(const item of nearbyHotels) {
     const row=document.createElement('li');
     const details=document.createElement('div');
     const name=document.createElement('strong');
-    name.textContent=item.hotel.name||'Hotel zonder naam';
+    name.textContent=item.hotel.name||'Accommodatie zonder naam';
     const address=document.createElement('span');
     address.textContent=item.hotel.address||'Adres onbekend';
     details.append(name,address);
     const websiteValue=typeof item.hotel.website==='string'?item.hotel.website.trim():'';
     const websiteUrl=websiteValue?
-      HotelMapLayer.safeHotelWebsite(/^https?:\/\//i.test(websiteValue)?websiteValue:`https://${websiteValue}`):
+      AccommodationMapLayer.safeAccommodationWebsite(/^https?:\/\//i.test(websiteValue)?websiteValue:`https://${websiteValue}`):
       null;
     if(websiteUrl) {
       const website=document.createElement('a');
@@ -394,7 +394,7 @@ function renderNearbyHotels(routePoint) {
     row.append(details,distance);
     list.append(row);
   }
-  status.textContent=`${nearbyHotels.length} ${nearbyHotels.length===1?'hotel':'hotels'} binnen ${radiusText} km van het geselecteerde routepunt.`;
+  status.textContent=`${nearbyHotels.length} ${nearbyHotels.length===1?'accommodatie':'accommodaties'} binnen ${radiusText} km van het geselecteerde routepunt.`;
 }
 function loadNearbyHotels() {
   readStoredHotels().then(hotels=>{
@@ -404,10 +404,10 @@ function loadNearbyHotels() {
     if(dashboardHotelLayer)dashboardHotelLayer.setHotels(hotels);
     renderNearbyHotels(interp(cursorKm));
   }).catch(error=>{
-    console.error('De hotelgegevens konden niet uit browseropslag worden geladen.',error);
+    console.error('De accommodatiegegevens konden niet uit browseropslag worden geladen.',error);
     hotelDataLoaded=true;
-    hotelDataError=error.message||'De opgeslagen hotels konden niet worden geladen.';
-    $('#dashboardHotelStatus').textContent=`Hotelgegevens niet beschikbaar: ${hotelDataError}`;
+    hotelDataError=error.message||'De opgeslagen accommodaties konden niet worden geladen.';
+    $('#dashboardHotelStatus').textContent=`Accommodatiegegevens niet beschikbaar: ${hotelDataError}`;
     if(dashboardHotelLayer)dashboardHotelLayer.setHotels([]);
     renderNearbyHotels(interp(cursorKm));
   });
@@ -431,15 +431,15 @@ function initMap() {
           'line-color':'#234930','line-width':5,'line-opacity':.9
         }
       });
-      dashboardHotelLayer=HotelMapLayer.create(map,{
-        sourceId:'dashboard-hotels',
-        layerId:'dashboard-hotel-markers',
+      dashboardHotelLayer=AccommodationMapLayer.create(map,{
+        sourceId:'dashboard-accommodations',
+        layerId:'dashboard-accommodation-markers',
         toggle:$('#showDashboardHotels'),
         status:$('#dashboardHotelStatus')
       });
       dashboardHotelLayer.setHotels(storedHotels);
       if(hotelDataError) {
-        $('#dashboardHotelStatus').textContent=`Hotelgegevens niet beschikbaar: ${hotelDataError}`;
+        $('#dashboardHotelStatus').textContent=`Accommodatiegegevens niet beschikbaar: ${hotelDataError}`;
       }
       map.on('click','route-line',event=>{
         update(nearestRouteKm(event.lngLat),false,true)
@@ -736,7 +736,7 @@ addEventListener('resize',()=>{drawProfile();drawProgressChart()});
                    Number.isFinite(settings.hotelRadiusKm)&&settings.hotelRadiusKm>=0) {
                   hotelRadiusKm=settings.hotelRadiusKm;
                 } else {
-                  console.warn('De ingestelde hotelstraal is ongeldig; 10 km wordt gebruikt.');
+                  console.warn('De ingestelde straal voor accommodaties is ongeldig; 10 km wordt gebruikt.');
                 }
               }
               if(typeof settings.start==='string')DATA.schedules.start=settings.start;

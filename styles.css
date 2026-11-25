@@ -14,7 +14,7 @@
 .settings-field input:focus,.settings-link:focus-visible,.dashboard-link:focus-visible,.button:focus-visible{outline:3px solid #0f766e55;outline-offset:2px}
 .settings-status{min-height:1.45em;margin:10px 0;color:#9a3412}
 .form-actions{display:flex;justify-content:flex-end;gap:10px}
-.scenario-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}
+.scenario-settings-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
 .scenario-settings{margin-bottom:0}
 .settings-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .settings-fields .settings-field{margin:0}
@@ -38,7 +38,13 @@
 .scenario-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}
 .scenario-toolbar h2{margin:0;font-size:17px}
 .scenario-settings-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-.scenario-settings-heading h2{margin:0}
+.scenario-settings-heading h2{flex:1;min-width:0;margin:0}
+.scenario-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.scenario-toggle:focus-visible{outline:3px solid #0f766e55;outline-offset:3px;border-radius:4px}
+.scenario-toggle-title{overflow-wrap:anywhere}
+.scenario-toggle-icon{flex:none;color:var(--muted);transition:transform .15s ease}
+.scenario-settings.is-collapsed .scenario-toggle-icon{transform:rotate(-90deg)}
+.scenario-settings-content[hidden]{display:none}
 .scenario-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .scenario-actions .button{min-height:38px;padding:7px 10px}
 .scenario-actions .scenario-move{min-width:38px;font-size:18px}
@@ -50,8 +56,7 @@
 .progress-legend-line{display:inline-block;width:22px;border-top:3px solid var(--scenario-color)}
 @media(max-width:900px){.scenario-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.scenario-grid{grid-template-columns:1fr}.scenario-toolbar{align-items:flex-start;flex-direction:column}}
-@media(max-width:850px){.scenario-settings-grid{grid-template-columns:1fr}}
-@media(max-width:520px){.brand{gap:10px;min-width:0}.brand-logo{width:84px}.brand>div{min-width:0}.header-actions{width:100%;flex-basis:100%;justify-content:space-between}.control{flex:1;justify-content:center}.settings-card{padding:16px}.settings-fields{grid-template-columns:1fr}.speed-zone{grid-template-columns:repeat(2,minmax(0,1fr))}.zone-remove{grid-column:2;justify-self:end}.form-actions{flex-wrap:wrap}.progress-chart-wrap{height:300px}.scenario-settings-heading{align-items:flex-start;flex-direction:column}.scenario-actions{width:100%;justify-content:flex-start;flex-wrap:wrap}}
+@media(max-width:520px){.brand{gap:10px;min-width:0}.brand-logo{width:84px}.brand>div{min-width:0}.header-actions{width:100%;flex-basis:100%;justify-content:space-between}.control{flex:1;justify-content:center}.settings-card{padding:16px}.settings-fields{grid-template-columns:1fr}.speed-zone{grid-template-columns:repeat(2,minmax(0,1fr))}.zone-remove{grid-column:2;justify-self:end}.form-actions{flex-wrap:wrap}.progress-chart-wrap{height:300px}.scenario-settings-heading{align-items:flex-start;flex-direction:column}.scenario-settings-heading h2{width:100%;flex:auto}.scenario-actions{width:100%;justify-content:flex-start;flex-wrap:wrap}}
 .collapsible-heading{margin:0 0 14px}
 .card-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .card-toggle:focus-visible{outline:3px solid #0f766e55;outline-offset:3px;border-radius:4px}
@@ -67,7 +72,7 @@
 .nearby-hotels-list a{color:#234930;overflow-wrap:anywhere}
 .nearby-hotel-extra-info{color:var(--muted)}
 .nearby-hotel-distance{font-weight:650;white-space:nowrap}
-.hotel-demo{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f6f9f8}
+.hotel-demo{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .hotel-demo h3{margin:0 0 6px;font-size:15px}
 .hotel-demo p{margin:8px 0}
 .hotel-demo .button{margin-top:4px}
@@ -82,14 +87,10 @@
 .hotel-bulk-progress{margin:12px 0}
 .hotel-bulk-progress progress{display:block;width:100%;height:14px;margin-top:6px;accent-color:var(--accent)}
 .hotel-bulk-progress p{margin:8px 0}
-.hotel-import{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}
-.hotel-import h3{margin:0 0 6px;font-size:16px}
-.hotel-import p{margin:8px 0}
 .hotel-import-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .hotel-import-controls input[type=file]{min-width:min(100%,260px);max-width:100%}
 .hotel-import-controls label{font-weight:600}
 .hotel-import-controls .button{margin:0}
-.hotel-import #hotelImportStatus{min-height:1em}
 .hotel-list{display:grid;gap:12px}
 .hotel-record-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));align-items:start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
 .hotel-record-card h3{min-width:0;margin:0;font-size:15px;overflow-wrap:anywhere}

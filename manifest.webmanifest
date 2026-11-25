@@ -23,9 +23,9 @@
   ],
   "shortcuts": [
     {
-      "name": "Hotels",
-      "short_name": "Hotels",
-      "url": "./hotels.html",
+      "name": "Accommodaties",
+      "short_name": "Accommodaties",
+      "url": "./accommodations.html",
       "icons": [
         {
           "src": "icon-192.png",

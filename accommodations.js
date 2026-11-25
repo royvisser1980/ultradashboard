@@ -40,7 +40,7 @@ const DEMO_HOTELS=[
   geocodedAt:null,
   geocoder:null
 }));
-let hotelDatabase=null,savedHotels=[],hotelMap=null,hotelMapLayer=null;
+let hotelDatabase=null,savedHotels=[],hotelMap=null,hotelMapLayer=null,hotelRouteCoordinates=null;
 let nominatimBusy=false,hotelImportBusy=false,lastNominatimRequestAt=0;
 const hotelMessages=new Map();
 const $=selector=>document.querySelector(selector);
@@ -58,8 +58,8 @@ function openHotelDatabase() {
       }
     };
     request.onsuccess=()=>resolve(request.result);
-    request.onerror=()=>reject(request.error||new Error('De hotelopslag kon niet worden geopend.'));
-    request.onblocked=()=>reject(new Error('De hotelopslag wordt geblokkeerd door een ander browsertabblad.'));
+    request.onerror=()=>reject(request.error||new Error('De opslag van accommodaties kon niet worden geopend.'));
+    request.onblocked=()=>reject(new Error('De opslag van accommodaties wordt geblokkeerd door een ander browsertabblad.'));
   });
 }
 
@@ -86,10 +86,10 @@ function loadHotelRadiusSetting() {
       input.value=String(radius);
     } else {
       input.value=String(DEFAULT_HOTEL_RADIUS_KM);
-      setHotelRadiusStatus('De opgeslagen hotelstraal is ongeldig; 10 km wordt gebruikt.');
+      setHotelRadiusStatus('De opgeslagen zoekstraal is ongeldig; 10 km wordt gebruikt.');
     }
   } catch(error) {
-    console.error('De hotelstraal kon niet uit browseropslag worden gelezen.',error);
+    console.error('De zoekstraal voor accommodaties kon niet uit browseropslag worden gelezen.',error);
     input.value=String(DEFAULT_HOTEL_RADIUS_KM);
     setHotelRadiusStatus('De opgeslagen instellingen konden niet worden gelezen; 10 km wordt gebruikt.');
   }
@@ -99,7 +99,7 @@ function saveHotelRadiusSetting(event) {
   event.preventDefault();
   const input=$('#hotelRadiusKm');
   if(!input.value.trim()||!input.checkValidity()) {
-    setHotelRadiusStatus('Vul een geldige hotelstraal van 0 km of meer in.');
+    setHotelRadiusStatus('Vul een geldige zoekstraal van 0 km of meer in.');
     input.focus();
     return;
   }
@@ -115,8 +115,8 @@ function saveHotelRadiusSetting(event) {
     const formattedRadius=new Intl.NumberFormat('nl-NL',{maximumFractionDigits:1}).format(radius);
     setHotelRadiusStatus(`Zoekstraal opgeslagen: ${formattedRadius} km.`);
   } catch(error) {
-    console.error('De hotelstraal kon niet in browseropslag worden opgeslagen.',error);
-    setHotelRadiusStatus(error.message||'De hotelstraal kon niet worden opgeslagen.');
+    console.error('De zoekstraal voor accommodaties kon niet in browseropslag worden opgeslagen.',error);
+    setHotelRadiusStatus(error.message||'De zoekstraal kon niet worden opgeslagen.');
   }
 }
 
@@ -125,8 +125,8 @@ function readHotel(id) {
     const transaction=hotelDatabase.transaction(HOTEL_STORE_NAME,'readonly');
     const request=transaction.objectStore(HOTEL_STORE_NAME).get(id);
     request.onsuccess=()=>resolve(request.result||null);
-    request.onerror=()=>reject(request.error||new Error('Het hotel kon niet uit browseropslag worden gelezen.'));
-    transaction.onabort=()=>reject(transaction.error||new Error('Het lezen van het hotel is afgebroken.'));
+    request.onerror=()=>reject(request.error||new Error('De accommodatie kon niet uit browseropslag worden gelezen.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Het lezen van de accommodatie is afgebroken.'));
   });
 }
 
@@ -135,8 +135,8 @@ function readAllHotels() {
     const transaction=hotelDatabase.transaction(HOTEL_STORE_NAME,'readonly');
     const request=transaction.objectStore(HOTEL_STORE_NAME).getAll();
     request.onsuccess=()=>resolve(request.result||[]);
-    request.onerror=()=>reject(request.error||new Error('De hotels konden niet uit browseropslag worden gelezen.'));
-    transaction.onabort=()=>reject(transaction.error||new Error('Het ophalen van de hotels is afgebroken.'));
+    request.onerror=()=>reject(request.error||new Error('De accommodaties konden niet uit browseropslag worden gelezen.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Het ophalen van de accommodaties is afgebroken.'));
   });
 }
 
@@ -145,8 +145,8 @@ function writeHotel(hotel) {
     const transaction=hotelDatabase.transaction(HOTEL_STORE_NAME,'readwrite');
     transaction.objectStore(HOTEL_STORE_NAME).put(hotel);
     transaction.oncomplete=()=>resolve();
-    transaction.onerror=()=>reject(transaction.error||new Error('Het hotel kon niet in browseropslag worden opgeslagen.'));
-    transaction.onabort=()=>reject(transaction.error||new Error('Het opslaan van het hotel is afgebroken.'));
+    transaction.onerror=()=>reject(transaction.error||new Error('De accommodatie kon niet in browseropslag worden opgeslagen.'));
+    transaction.onabort=()=>reject(transaction.error||new Error('Het opslaan van de accommodatie is afgebroken.'));
   });
 }
 
@@ -217,13 +217,13 @@ function renderHotels() {
     const card=document.createElement('article');
     card.className='hotel-record-card';
     const heading=document.createElement('h3');
-    heading.textContent=hotel.name||'Hotel zonder naam';
+    heading.textContent=hotel.name||'Accommodatie zonder naam';
     const details=document.createElement('dl');
     details.className='hotel-record';
     details.append(
       hotelField('Adres',hotel.address),
-      hotelField('Telefoon',hotel.phone,HotelMapLayer.safeHotelPhone(hotel.phone)),
-      hotelField('Website',hotel.website,HotelMapLayer.safeHotelWebsite(hotel.website)),
+      hotelField('Telefoon',hotel.phone,AccommodationMapLayer.safeAccommodationPhone(hotel.phone)),
+      hotelField('Website',hotel.website,AccommodationMapLayer.safeAccommodationWebsite(hotel.website)),
       hotelField('Extra info',hotel.extraInfo,null,{expandable:true}),
       hotelField('Coördinaten',hasCoordinates(hotel)?
         `${hotel.latitude.toFixed(5)}, ${hotel.longitude.toFixed(5)}`:'Nog niet opgehaald')
@@ -234,12 +234,15 @@ function renderHotels() {
     button.disabled=nominatimBusy||hotelImportBusy||!hotelDatabase||hasCoordinates(hotel);
     button.textContent='Coördinaten ophalen';
     button.addEventListener('click',()=>geocodeHotel(hotel.id));
-    const status=document.createElement('p');
-    status.className='hotel-status small';
-    status.setAttribute('role','status');
-    status.textContent=hotelMessages.get(hotel.id)||
-      (hasCoordinates(hotel)?'Coördinaten zijn lokaal opgeslagen.':'');
-    card.append(heading,details,button,status);
+    card.append(heading,details,button);
+    const message=hotelMessages.get(hotel.id);
+    if(message) {
+      const status=document.createElement('p');
+      status.className='hotel-status small';
+      status.setAttribute('role','status');
+      status.textContent=message;
+      card.append(status);
+    }
     list.append(card);
   }
 }
@@ -251,7 +254,63 @@ function updateHotelControls() {
   const busy=hotelImportBusy||nominatimBusy||!hotelDatabase;
   fileInput.disabled=busy;
   importButton.disabled=busy||!fileInput.files.length;
-  exportButton.disabled=busy||savedHotels.length===0||typeof XLSX==='undefined';
+  exportButton.disabled=busy||typeof XLSX==='undefined';
+}
+
+function initializeHotelCollapsibleCards() {
+  for(const card of document.querySelectorAll('.hotel-collapsible-card')) {
+    const toggle=card.querySelector('.card-toggle');
+    const content=document.getElementById(toggle.getAttribute('aria-controls'));
+    toggle.addEventListener('click',()=>{
+      const collapsed=!card.classList.contains('is-collapsed');
+      card.classList.toggle('is-collapsed',collapsed);
+      toggle.setAttribute('aria-expanded',String(!collapsed));
+      content.hidden=collapsed;
+      if(!collapsed&&card.dataset.cardId==='hotelMap') {
+        requestAnimationFrame(()=>{if(hotelMap)hotelMap.resize()});
+      }
+    });
+  }
+}
+
+async function loadHotelRouteCoordinates() {
+  const response=await fetch('data.json');
+  if(!response.ok)throw new Error(`De routedata kon niet worden geladen (${response.status}).`);
+  const data=await response.json();
+  if(!Array.isArray(data.route)||data.route.length<2) {
+    throw new Error('De routedata bevat geen bruikbare route.');
+  }
+  return data.route.map((point,index)=>{
+    if(!Array.isArray(point)||!Number.isFinite(point[1])||!Number.isFinite(point[2])||
+       Math.abs(point[1])>180||Math.abs(point[2])>90) {
+      throw new Error(`Routepunt ${index+1} bevat ongeldige coördinaten.`);
+    }
+    return [point[1],point[2]];
+  });
+}
+
+function fitHotelMapToRouteAndHotels() {
+  const bounds=new maplibregl.LngLatBounds();
+  hotelRouteCoordinates.forEach(coordinates=>bounds.extend(coordinates));
+  for(const hotel of savedHotels) {
+    if(hotel.longitude===null||hotel.longitude===undefined||hotel.longitude===''||
+       hotel.latitude===null||hotel.latitude===undefined||hotel.latitude==='')continue;
+    const longitude=Number(hotel.longitude),latitude=Number(hotel.latitude);
+    if(Number.isFinite(longitude)&&Number.isFinite(latitude)&&
+       Math.abs(longitude)<=180&&Math.abs(latitude)<=90) {
+      bounds.extend([longitude,latitude]);
+    }
+  }
+  hotelMap.fitBounds(bounds,{padding:55,maxZoom:10,duration:0});
+}
+
+function setHotelRouteVisibility() {
+  if(!hotelMap||!hotelMap.getLayer('route-line'))return;
+  hotelMap.setLayoutProperty(
+    'route-line',
+    'visibility',
+    $('#showHotelRoute').checked?'visible':'none'
+  );
 }
 
 function initializeHotelMap() {
@@ -264,13 +323,43 @@ function initializeHotelMap() {
       zoom:7
     });
     hotelMap.addControl(new maplibregl.NavigationControl(),'top-right');
-    hotelMap.on('load',()=>{
-      hotelMapLayer=HotelMapLayer.create(hotelMap,{
-        sourceId:'saved-hotels',
-        layerId:'saved-hotels-points',
+    hotelMap.on('load',async()=>{
+      hotelMapLayer=AccommodationMapLayer.create(hotelMap,{
+        sourceId:'saved-accommodations',
+        layerId:'saved-accommodations-points',
         status:$('#hotelMapStatus')
       });
-      hotelMapLayer.setHotels(savedHotels,true);
+      hotelMapLayer.setHotels(savedHotels);
+      try {
+        const routeCoordinates=await loadHotelRouteCoordinates();
+        hotelMap.addSource('route', {
+          type:'geojson',
+          data:{
+            type:'Feature',
+            properties:{},
+            geometry:{type:'LineString',coordinates:routeCoordinates}
+          }
+        });
+        hotelMap.addLayer({
+          id:'route-line',
+          type:'line',
+          source:'route',
+          paint:{
+            'line-color':'#234930',
+            'line-width':5,
+            'line-opacity':0.9
+          }
+        },'saved-accommodations-points');
+        hotelRouteCoordinates=routeCoordinates;
+        $('#showHotelRoute').disabled=false;
+        setHotelRouteVisibility();
+        fitHotelMapToRouteAndHotels();
+      } catch(error) {
+        console.error('De route kon niet op de kaart met accommodaties worden getoond.',error);
+        hotelMapLayer.setHotels(savedHotels,true);
+        $('#hotelMapWarn').textContent=error.message||'De route kon niet op de kaart met accommodaties worden getoond.';
+        $('#hotelMapWarn').style.display='block';
+      }
     });
     hotelMap.on('error',()=>{
       if(!hotelMap.loaded()) {
@@ -279,8 +368,8 @@ function initializeHotelMap() {
       }
     });
   } catch(error) {
-    console.error('De hotelkaart kon niet worden gestart.',error);
-    $('#hotelMapWarn').textContent=error.message||'De hotelkaart kon niet worden gestart.';
+    console.error('De kaart met accommodaties kon niet worden gestart.',error);
+    $('#hotelMapWarn').textContent=error.message||'De kaart met accommodaties kon niet worden gestart.';
     $('#hotelMapWarn').style.display='block';
   }
 }
@@ -288,7 +377,13 @@ function initializeHotelMap() {
 async function refreshHotels(fitMap=false) {
   savedHotels=await readAllHotels();
   renderHotels();
-  if(hotelMapLayer)hotelMapLayer.setHotels(savedHotels,fitMap);
+  if(hotelMapLayer) {
+    hotelMapLayer.setHotels(savedHotels);
+    if(fitMap) {
+      if(hotelRouteCoordinates)fitHotelMapToRouteAndHotels();
+      else hotelMapLayer.setHotels(savedHotels,true);
+    }
+  }
 }
 
 function setHotelStatus(message) {
@@ -354,14 +449,18 @@ function getHotelImportColumns(headerRow) {
   const headers=headerRow.map(normalizeHeader);
   const findColumn=aliases=>headers.findIndex(header=>aliases.includes(header));
   const columns={
-    name:findColumn(['naam hotel','hotelnaam']),
+    name:findColumn([
+      'naam accommodatie','accommodatienaam',
+      'naam slaapplek','slaappleknaam',
+      'naam hotel','hotelnaam'
+    ]),
     address:findColumn(['adres']),
     phone:findColumn(['telefoon','telefoonnummer']),
     website:findColumn(['website','link website','link naar website','link naar de website']),
     extraInfo:findColumn(['extra info','extra informatie'])
   };
   if(columns.name<0||columns.address<0) {
-    throw new Error('De eerste rij moet de kolommen "Naam hotel" en "Adres" bevatten. Gebruik het demo-Excelbestand als voorbeeld.');
+    throw new Error('De eerste rij moet de kolommen "Naam accommodatie" en "Adres" bevatten.');
   }
   return columns;
 }
@@ -406,9 +505,9 @@ async function parseHotelWorkbook(file) {
     raw:false,
     blankrows:false
   });
-  if(rows.length<2)throw new Error('Het werkblad bevat geen hotelgegevens onder de kolomkoppen.');
+  if(rows.length<2)throw new Error('Het werkblad bevat geen accommodatiegegevens onder de kolomkoppen.');
   if(rows.length-1>MAX_IMPORTED_HOTELS) {
-    throw new Error(`Er kunnen maximaal ${MAX_IMPORTED_HOTELS} hotels tegelijk worden geïmporteerd.`);
+    throw new Error(`Er kunnen maximaal ${MAX_IMPORTED_HOTELS} accommodaties tegelijk worden geïmporteerd.`);
   }
   const columns=getHotelImportColumns(rows[0]);
   const hotels=[];
@@ -423,11 +522,11 @@ async function parseHotelWorkbook(file) {
       extraInfo:columns.extraInfo<0?'':spreadsheetText(row[columns.extraInfo])
     };
     if(!hotel.name||!hotel.address) {
-      throw new Error(`Rij ${index+1}: vul zowel "Naam hotel" als "Adres" in.`);
+      throw new Error(`Rij ${index+1}: vul zowel "Naam accommodatie" als "Adres" in.`);
     }
     hotels.push(hotel);
   }
-  if(hotels.length===0)throw new Error('Er zijn geen geldige hotelgegevens gevonden.');
+  if(hotels.length===0)throw new Error('Er zijn geen geldige accommodatiegegevens gevonden.');
   return hotels;
 }
 
@@ -487,12 +586,12 @@ function replaceHotelsWithImport(importedHotels) {
       }
     };
     request.onerror=()=>{
-      failure=request.error||new Error('De bestaande hotels konden niet worden gelezen.');
+      failure=request.error||new Error('De bestaande accommodaties konden niet worden gelezen.');
       transaction.abort();
     };
     transaction.oncomplete=()=>resolve(importedResult);
-    transaction.onerror=()=>reject(failure||transaction.error||new Error('De hotelimport is mislukt.'));
-    transaction.onabort=()=>reject(failure||transaction.error||new Error('De hotelimport is afgebroken.'));
+    transaction.onerror=()=>reject(failure||transaction.error||new Error('De import van accommodaties is mislukt.'));
+    transaction.onabort=()=>reject(failure||transaction.error||new Error('De import van accommodaties is afgebroken.'));
   });
 }
 
@@ -502,16 +601,12 @@ function setHotelFileStatus(message) {
 
 function exportHotelsToWorkbook() {
   if(hotelImportBusy||nominatimBusy||!hotelDatabase)return;
-  if(savedHotels.length===0) {
-    setHotelFileStatus('Er zijn geen opgeslagen hotels om te exporteren.');
-    return;
-  }
   try {
     if(typeof XLSX==='undefined') {
       throw new Error('De Excel-bibliotheek kon niet worden geladen. Controleer de internetverbinding en probeer het opnieuw.');
     }
     const rows=[
-      ['Naam hotel','Adres','Telefoon','Website','Extra info'],
+      ['Naam accommodatie','Adres','Telefoon','Website','Extra info'],
       ...savedHotels.map(hotel=>[
         hotel.name||'',
         hotel.address||'',
@@ -522,11 +617,13 @@ function exportHotelsToWorkbook() {
     ];
     const worksheet=XLSX.utils.aoa_to_sheet(rows);
     const workbook=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook,worksheet,'Hotels');
-    XLSX.writeFile(workbook,'hotels.xlsx',{bookType:'xlsx'});
-    setHotelFileStatus(`${savedHotels.length} hotels geëxporteerd naar hotels.xlsx.`);
+    XLSX.utils.book_append_sheet(workbook,worksheet,'Accommodaties');
+    XLSX.writeFile(workbook,'accommodations.xlsx',{bookType:'xlsx'});
+    setHotelFileStatus(savedHotels.length===0?
+      'Leeg Excel-template geëxporteerd naar accommodations.xlsx.':
+      `${savedHotels.length} accommodaties geëxporteerd naar accommodations.xlsx.`);
   } catch(error) {
-    console.error('De hotels konden niet naar Excel worden geëxporteerd.',error);
+    console.error('De accommodaties konden niet naar Excel worden geëxporteerd.',error);
     setHotelFileStatus(error.message||'De Excel-export is mislukt.');
   }
 }
@@ -549,11 +646,11 @@ async function importHotelsFromFile() {
     $('#hotelWorkbook').value='';
     await refreshHotels(true);
     setHotelFileStatus(
-      `${result.hotelCount} hotels geïmporteerd; ${result.preservedCoordinateCount} bestaande coördinatensets behouden.`
+      `${result.hotelCount} accommodaties geïmporteerd; ${result.preservedCoordinateCount} bestaande coördinatensets behouden.`
     );
-    setHotelStatus('De hotelcollectie is volledig vervangen door de Excel-import.');
+    setHotelStatus('De collectie accommodaties is volledig vervangen door de Excel-import.');
   } catch(error) {
-    console.error('De hotelimport is mislukt.',error);
+    console.error('De import van accommodaties is mislukt.',error);
     setHotelFileStatus(error.message||'De Excel-import is mislukt. Controleer het bestand en probeer het opnieuw.');
   } finally {
     hotelImportBusy=false;
@@ -596,7 +693,7 @@ async function requestHotelCoordinates(hotel,fitMap) {
       geocodedAt:new Date().toISOString(),
       geocoder:'Nominatim'
     });
-    hotelMessages.set(hotel.id,`Coördinaten lokaal opgeslagen: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}.`);
+    hotelMessages.delete(hotel.id);
     await refreshHotels(fitMap);
     setHotelStatus(`${hotel.name}: coördinaten lokaal opgeslagen.`);
     return true;
@@ -640,7 +737,7 @@ async function geocodeMissingHotels() {
   if(nominatimBusy||!hotelDatabase)return;
   const pendingHotels=savedHotels.filter(hotel=>!hasCoordinates(hotel));
   if(pendingHotels.length===0) {
-    setHotelStatus('Alle opgeslagen hotels hebben al geldige coördinaten.');
+    setHotelStatus('Alle opgeslagen accommodaties hebben al geldige coördinaten.');
     return;
   }
   nominatimBusy=true;
@@ -658,7 +755,7 @@ async function geocodeMissingHotels() {
         processed<pendingHotels.length?pendingHotels[processed].name:'');
     }
     await refreshHotels(true);
-    setHotelStatus(`${processed} hotels verwerkt: ${succeeded} coördinaten opgehaald, ${failed} mislukt.`);
+    setHotelStatus(`${processed} accommodaties verwerkt: ${succeeded} coördinaten opgehaald, ${failed} mislukt.`);
   } finally {
     nominatimBusy=false;
     renderHotels();
@@ -670,11 +767,13 @@ $('#hotelWorkbook').addEventListener('change',updateHotelControls);
 $('#importHotels').addEventListener('click',importHotelsFromFile);
 $('#exportHotels').addEventListener('click',exportHotelsToWorkbook);
 $('#hotelRadiusForm').addEventListener('submit',saveHotelRadiusSetting);
+$('#showHotelRoute').addEventListener('change',setHotelRouteVisibility);
 loadHotelRadiusSetting();
+initializeHotelCollapsibleCards();
 
 initializeDemoHotels().catch(error=>{
-  console.error('De demo-hotels konden niet uit IndexedDB worden opgehaald.',error);
-  setHotelStatus(error.message||'De hotels konden niet uit de lokale browseropslag worden geladen.');
+  console.error('De voorbeeldaccommodaties konden niet uit IndexedDB worden opgehaald.',error);
+  setHotelStatus(error.message||'De accommodaties konden niet uit de lokale browseropslag worden geladen.');
 }).finally(()=>{
   initializeHotelMap();
 });

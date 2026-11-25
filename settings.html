@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#234930">
     <link rel="manifest" href="manifest.webmanifest">
     <title>Schema's - BORDERLINE700</title>
-    <link href="styles.css?v=2" rel="stylesheet">
+    <link href="styles.css?v=6" rel="stylesheet">
   </head>
   <body>
     <main class="wrap">
@@ -15,7 +15,6 @@
           <img class="brand-logo" src="borderline700-logo.png" alt="BORDERLINE700-logo">
           <div>
             <h1>Schema's</h1>
-            <div class="sub">Starttijd en eigenschappen van de schema's.</div>
           </div>
         </div>
       </header>
@@ -54,6 +53,7 @@
       let settingsReady=false;
       let scenarios=[];
       let nextScenarioId=1;
+      let nextScenarioContentId=1;
 
       function createField(labelText,type,value,fieldName,options={}) {
         const label=document.createElement('label');
@@ -138,10 +138,34 @@
         card.dataset.scenario=scenario.id;
         scenario.card=card;
         card.style.setProperty('--scenario-color',scenario.color);
+        card.classList.add('is-collapsed');
+        const content=document.createElement('div');
+        content.id=`scenario-settings-content-${nextScenarioContentId++}`;
+        content.className='scenario-settings-content';
+        content.hidden=true;
         const headingRow=document.createElement('div');
         headingRow.className='scenario-settings-heading';
         const heading=document.createElement('h2');
-        heading.textContent=scenario.name;
+        const toggle=document.createElement('button');
+        toggle.type='button';
+        toggle.className='scenario-toggle';
+        toggle.setAttribute('aria-expanded','false');
+        toggle.setAttribute('aria-controls',content.id);
+        const headingText=document.createElement('span');
+        headingText.className='scenario-toggle-title';
+        headingText.textContent=scenario.name;
+        const toggleIcon=document.createElement('span');
+        toggleIcon.className='scenario-toggle-icon';
+        toggleIcon.setAttribute('aria-hidden','true');
+        toggleIcon.textContent='▾';
+        toggle.append(headingText,toggleIcon);
+        toggle.addEventListener('click',()=>{
+          const expanded=toggle.getAttribute('aria-expanded')!=='true';
+          toggle.setAttribute('aria-expanded',String(expanded));
+          content.hidden=!expanded;
+          card.classList.toggle('is-collapsed',!expanded);
+        });
+        heading.append(toggle);
         const actions=document.createElement('div');
         actions.className='scenario-actions';
         const moveUp=document.createElement('button');
@@ -174,6 +198,7 @@
         actions.append(moveUp,moveDown,removeScenario);
         headingRow.append(heading,actions);
         card.append(headingRow);
+        card.append(content);
 
         const fields=document.createElement('div');
         fields.className='settings-fields';
@@ -190,7 +215,7 @@
         );
         fields.querySelector('[data-field="scenarioName"]').addEventListener('input',event=>{
           scenario.name=event.target.value.trim();
-          heading.textContent=scenario.name||'Naamloos schema';
+          headingText.textContent=scenario.name||'Naamloos schema';
           removeScenario.setAttribute('aria-label',`Verwijder schema ${scenario.name||'Naamloos schema'}`);
           moveUp.setAttribute('aria-label',`Verplaats ${scenario.name||'Naamloos schema'} omhoog`);
           moveDown.setAttribute('aria-label',`Verplaats ${scenario.name||'Naamloos schema'} omlaag`);
@@ -199,20 +224,20 @@
           card.style.setProperty('--scenario-color',event.target.value);
           scenario.color=event.target.value;
         });
-        card.append(fields);
+        content.append(fields);
 
         const zoneHeading=document.createElement('h3');
         zoneHeading.textContent='Snelheid per kilometervak';
-        card.append(zoneHeading);
+        content.append(zoneHeading);
         const help=document.createElement('p');
         help.className='settings-help';
         help.textContent=`De vakken moeten aansluiten van 0 tot ${routeTotalKm.toFixed(3)} km, zonder overlap of gaten.`;
-        card.append(help);
+        content.append(help);
         const zoneList=document.createElement('div');
         zoneList.className='speed-zone-list';
         config.speedZones.forEach((zone,index)=>zoneList.append(zoneRow(zone,index,zoneList)));
         updateZoneBounds(zoneList);
-        card.append(zoneList);
+        content.append(zoneList);
 
         const addButton=document.createElement('button');
         addButton.type='button';
@@ -235,7 +260,7 @@
           setStatus('');
           updateFinishPreviews();
         });
-        card.append(addButton);
+        content.append(addButton);
         const finishPreview=document.createElement('div');
         finishPreview.className='finish-preview';
         const finishLabel=document.createElement('span');
@@ -244,7 +269,7 @@
         finishValue.dataset.finishTime='';
         finishValue.textContent='Wordt berekend...';
         finishPreview.append(finishLabel,finishValue);
-        card.append(finishPreview);
+        content.append(finishPreview);
         return card;
       }
 
