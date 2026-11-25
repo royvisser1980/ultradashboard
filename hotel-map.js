@@ -71,7 +71,7 @@
     return content;
   }
 
-  function create(map,{sourceId,layerId,toggle,status}) {
+  function create(map,{sourceId,layerId,toggle=null,status}) {
     map.addSource(sourceId,{type:'geojson',data:{type:'FeatureCollection',features:[]}});
     map.addLayer({
       id:layerId,
@@ -85,7 +85,7 @@
       }
     });
     const setVisibility=()=>{
-      map.setLayoutProperty(layerId,'visibility',toggle.checked?'visible':'none');
+      map.setLayoutProperty(layerId,'visibility',!toggle||toggle.checked?'visible':'none');
     };
     const setHotels=(hotels,fitToHotels=false)=>{
       const features=toFeatures(hotels);
@@ -117,7 +117,7 @@
     });
     map.on('mouseenter',layerId,()=>{map.getCanvas().style.cursor='pointer'});
     map.on('mouseleave',layerId,()=>{map.getCanvas().style.cursor=''});
-    toggle.addEventListener('change',setVisibility);
+    if(toggle)toggle.addEventListener('change',setVisibility);
     setVisibility();
     return {setHotels,setVisibility};
   }

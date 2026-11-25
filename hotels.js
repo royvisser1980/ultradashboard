@@ -3,6 +3,8 @@ const HOTEL_DB_VERSION=2;
 const HOTEL_STORE_NAME='hotels';
 const HOTEL_METADATA_STORE_NAME='metadata';
 const HOTEL_IMPORT_MARKER_KEY='hotel-workbook-imported';
+const SETTINGS_STORAGE_KEY='ultradashboard.settings';
+const DEFAULT_HOTEL_RADIUS_KM=10;
 const NOMINATIM_REQUEST_INTERVAL_MS=1500;
 const MAX_HOTEL_IMPORT_FILE_SIZE=5*1024*1024;
 const MAX_IMPORTED_HOTELS=5000;
@@ -59,6 +61,63 @@ function openHotelDatabase() {
     request.onerror=()=>reject(request.error||new Error('De hotelopslag kon niet worden geopend.'));
     request.onblocked=()=>reject(new Error('De hotelopslag wordt geblokkeerd door een ander browsertabblad.'));
   });
+}
+
+function setHotelRadiusStatus(message) {
+  $('#hotelRadiusStatus').textContent=message;
+}
+
+function loadHotelRadiusSetting() {
+  const input=$('#hotelRadiusKm');
+  try {
+    const raw=localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if(!raw) {
+      input.value=String(DEFAULT_HOTEL_RADIUS_KM);
+      return;
+    }
+    const settings=JSON.parse(raw);
+    if(!settings||typeof settings!=='object'||Array.isArray(settings)) {
+      throw new Error('De opgeslagen instellingen zijn ongeldig.');
+    }
+    const radius=settings.hotelRadiusKm;
+    if(radius===undefined) {
+      input.value=String(DEFAULT_HOTEL_RADIUS_KM);
+    } else if(typeof radius==='number'&&Number.isFinite(radius)&&radius>=0) {
+      input.value=String(radius);
+    } else {
+      input.value=String(DEFAULT_HOTEL_RADIUS_KM);
+      setHotelRadiusStatus('De opgeslagen hotelstraal is ongeldig; 10 km wordt gebruikt.');
+    }
+  } catch(error) {
+    console.error('De hotelstraal kon niet uit browseropslag worden gelezen.',error);
+    input.value=String(DEFAULT_HOTEL_RADIUS_KM);
+    setHotelRadiusStatus('De opgeslagen instellingen konden niet worden gelezen; 10 km wordt gebruikt.');
+  }
+}
+
+function saveHotelRadiusSetting(event) {
+  event.preventDefault();
+  const input=$('#hotelRadiusKm');
+  if(!input.value.trim()||!input.checkValidity()) {
+    setHotelRadiusStatus('Vul een geldige hotelstraal van 0 km of meer in.');
+    input.focus();
+    return;
+  }
+  try {
+    const raw=localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const settings=raw?JSON.parse(raw):{};
+    if(!settings||typeof settings!=='object'||Array.isArray(settings)) {
+      throw new Error('De opgeslagen instellingen zijn ongeldig.');
+    }
+    const radius=Number(input.value);
+    settings.hotelRadiusKm=radius;
+    localStorage.setItem(SETTINGS_STORAGE_KEY,JSON.stringify(settings));
+    const formattedRadius=new Intl.NumberFormat('nl-NL',{maximumFractionDigits:1}).format(radius);
+    setHotelRadiusStatus(`Zoekstraal opgeslagen: ${formattedRadius} km.`);
+  } catch(error) {
+    console.error('De hotelstraal kon niet in browseropslag worden opgeslagen.',error);
+    setHotelRadiusStatus(error.message||'De hotelstraal kon niet worden opgeslagen.');
+  }
 }
 
 function readHotel(id) {
@@ -122,12 +181,24 @@ function appendValue(element,value,href=null) {
   }
 }
 
-function hotelField(label,value,href=null) {
+function hotelField(label,value,href=null,{expandable=false}={}) {
   const row=document.createElement('div');
   const term=document.createElement('dt');
   term.textContent=label;
   const definition=document.createElement('dd');
-  appendValue(definition,value,href);
+  if(expandable&&value) {
+    const disclosure=document.createElement('details');
+    disclosure.className='hotel-extra-info';
+    const summary=document.createElement('summary');
+    summary.textContent=String(value);
+    const fullValue=document.createElement('span');
+    fullValue.className='hotel-extra-info-full';
+    fullValue.textContent=String(value);
+    disclosure.append(summary,fullValue);
+    definition.append(disclosure);
+  } else {
+    appendValue(definition,value,href);
+  }
   row.append(term,definition);
   return row;
 }
@@ -153,7 +224,7 @@ function renderHotels() {
       hotelField('Adres',hotel.address),
       hotelField('Telefoon',hotel.phone,HotelMapLayer.safeHotelPhone(hotel.phone)),
       hotelField('Website',hotel.website,HotelMapLayer.safeHotelWebsite(hotel.website)),
-      hotelField('Extra info',hotel.extraInfo),
+      hotelField('Extra info',hotel.extraInfo,null,{expandable:true}),
       hotelField('Coördinaten',hasCoordinates(hotel)?
         `${hotel.latitude.toFixed(5)}, ${hotel.longitude.toFixed(5)}`:'Nog niet opgehaald')
     );
@@ -161,8 +232,7 @@ function renderHotels() {
     button.className='button button-secondary';
     button.type='button';
     button.disabled=nominatimBusy||hotelImportBusy||!hotelDatabase||hasCoordinates(hotel);
-    button.textContent=hasCoordinates(hotel)?
-      'Coördinaten lokaal opgeslagen':'Coördinaten ophalen bij Nominatim';
+    button.textContent='Coördinaten ophalen';
     button.addEventListener('click',()=>geocodeHotel(hotel.id));
     const status=document.createElement('p');
     status.className='hotel-status small';
@@ -198,7 +268,6 @@ function initializeHotelMap() {
       hotelMapLayer=HotelMapLayer.create(hotelMap,{
         sourceId:'saved-hotels',
         layerId:'saved-hotels-points',
-        toggle:$('#showHotels'),
         status:$('#hotelMapStatus')
       });
       hotelMapLayer.setHotels(savedHotels,true);
@@ -230,7 +299,6 @@ async function initializeDemoHotels() {
   hotelDatabase=await openHotelDatabase();
   if(await readHotelImportMarker()) {
     await refreshHotels();
-    setHotelStatus(`${savedHotels.length} hotels uit IndexedDB geladen.`);
     return;
   }
   for(const demoHotel of DEMO_HOTELS) {
@@ -261,8 +329,6 @@ async function initializeDemoHotels() {
     });
   }
   await refreshHotels();
-  const demoCount=DEMO_HOTELS.length;
-  setHotelStatus(`${demoCount} demo-hotels en ${savedHotels.length-demoCount} overige hotels uit IndexedDB geladen.`);
 }
 
 function normalizeHeader(value) {
@@ -603,6 +669,8 @@ $('#geocodeAllHotels').addEventListener('click',geocodeMissingHotels);
 $('#hotelWorkbook').addEventListener('change',updateHotelControls);
 $('#importHotels').addEventListener('click',importHotelsFromFile);
 $('#exportHotels').addEventListener('click',exportHotelsToWorkbook);
+$('#hotelRadiusForm').addEventListener('submit',saveHotelRadiusSetting);
+loadHotelRadiusSetting();
 
 initializeDemoHotels().catch(error=>{
   console.error('De demo-hotels konden niet uit IndexedDB worden opgehaald.',error);
