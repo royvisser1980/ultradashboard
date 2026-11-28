@@ -1,16 +1,18 @@
-const CACHE_NAME='ultradashboard-pwa-v4';
+const CACHE_NAME='ultradashboard-pwa-v9';
 const APP_SHELL=[
   './index.html',
   './accommodations.html',
   './settings.html',
-  './styles.css?v=7',
+  './styles.css?v=10',
   './dashboard-common.js?v=1',
   './accommodation-data.js?v=1',
-  './dashboard.js?v=1',
-  './settings.js?v=1',
+  './dashboard.js?v=2',
+  './settings.js?v=2',
   './schedule.js?v=2',
+  './route-storage.js?v=1',
+  './route-import.js?v=2',
   './accommodation-map.js?v=4',
-  './accommodations.js?v=5',
+  './accommodations.js?v=6',
   './pwa.js?v=1',
   './data.json',
   './borderline700-logo.png',

@@ -9,7 +9,7 @@
     <title>BORDERLINE700 - Gouda-Luxemburg-Gouda ritdashboard</title>
 
     <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
-    <link href="styles.css?v=7" rel="stylesheet">
+    <link href="styles.css?v=10" rel="stylesheet">
     <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
   </head>
   <body>
@@ -32,7 +32,10 @@
           <nav class="header-navigation" aria-label="Navigatie">
             <a class="settings-link" href="settings.html">Schema's</a>
             <a class="settings-link" href="accommodations.html">Accommodaties</a>
+            <button id="routeImportButton" class="settings-link" type="button">Routeimport</button>
           </nav>
+          <input id="routeImportFile" type="file" accept=".gpx,application/gpx+xml" hidden>
+          <p id="routeImportStatus" class="small route-import-status" role="status" aria-live="polite"></p>
         </div>
       </div>
 
@@ -65,7 +68,7 @@
               <span class="card-toggle-icon" aria-hidden="true">▾</span>
             </button>
           </h2>
-          <p class="nearby-hotels-description">
+          <p id="nearbyHotelsDescription" class="nearby-hotels-description">
             Toont accommodaties met opgeslagen coördinaten die hemelsbreed binnen de ingestelde straal van het geselecteerde routepunt liggen.
             Pas de straal aan via Accommodaties.
           </p>
@@ -85,17 +88,18 @@
           </h2>
           <div class="collapsible-content" id="routeCardContent">
             <div id="map"></div>
+            <p id="mapEmptyState" class="route-empty-state" hidden></p>
             <div id="mapWarn" class="warn">
               De kaartachtergrond kon niet laden. De routegegevens blijven wel beschikbaar in het hoogteprofiel.
             </div>
-            <label class="hotel-map-toggle" for="showDashboardHotels">
+            <label id="dashboardHotelToggleLabel" class="hotel-map-toggle" for="showDashboardHotels">
               <input id="showDashboardHotels" type="checkbox" checked>
               Toon accommodaties op de kaart
             </label>
             <p id="dashboardHotelStatus" class="small" role="status" aria-live="polite">
               Opgeslagen accommodatiecoördinaten worden geladen.
             </p>
-            <p class="small">
+            <p id="mapAttribution" class="small">
               Geocodering: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
               via <a href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noopener noreferrer">Nominatim</a>.
             </p>
@@ -112,6 +116,7 @@
             <div class="profile-wrap">
               <canvas id="profile"></canvas>
             </div>
+            <p id="profileEmptyState" class="route-empty-state" hidden></p>
             <div class="legend">
               <span><i class="dot elevation-dot"></i>hoogte</span>
               <span><i class="dot current-km-dot"></i>huidige km-stand</span>
@@ -129,6 +134,7 @@
             <div class="progress-chart-wrap">
               <canvas id="progressChart" role="img" aria-label="Grafiek van afgelegde kilometers per verstreken uur. Klik of sleep verticaal om de km-stand te kiezen."></canvas>
             </div>
+            <p id="progressEmptyState" class="route-empty-state" hidden></p>
             <div class="progress-legend" id="progressLegend"></div>
           </div>
         </section>
@@ -137,8 +143,10 @@
     <script src="accommodation-data.js?v=1"></script>
     <script src="accommodation-map.js?v=4"></script>
     <script src="schedule.js?v=2"></script>
+    <script src="route-storage.js?v=1"></script>
+    <script src="route-import.js?v=2"></script>
     <script src="pwa.js?v=1"></script>
     <script src="dashboard-common.js?v=1"></script>
-    <script src="dashboard.js?v=1"></script>
+    <script src="dashboard.js?v=2"></script>
   </body>
 </html>

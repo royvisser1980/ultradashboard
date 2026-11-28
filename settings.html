@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#234930">
     <link rel="manifest" href="manifest.webmanifest">
     <title>Schema's - BORDERLINE700</title>
-    <link href="styles.css?v=7" rel="stylesheet">
+    <link href="styles.css?v=10" rel="stylesheet">
   </head>
   <body>
     <main class="wrap">
@@ -20,27 +20,37 @@
       </header>
 
       <form id="settingsForm" novalidate>
-        <section class="card settings-card settings-start-card">
-          <h2>Startdatum en -tijd</h2>
-          <label class="settings-field" for="startDate">Startdatum en -tijd</label>
-          <input id="startDate" name="startDate" type="datetime-local" step="60" required>
-        </section>
+        <div id="routeSettingsContent">
+          <section class="card settings-card settings-start-card">
+            <h2>Startdatum en -tijd</h2>
+            <label class="settings-field" for="startDate">Startdatum en -tijd</label>
+            <input id="startDate" name="startDate" type="datetime-local" step="60" required>
+          </section>
 
-        <div class="scenario-toolbar">
-          <h2>Schema's</h2>
-          <button class="button button-secondary" id="addScenario" type="button" disabled>Schema toevoegen</button>
+          <div class="scenario-toolbar">
+            <h2>Schema's</h2>
+            <button class="button button-secondary" id="addScenario" type="button" disabled>Schema toevoegen</button>
+          </div>
+          <div id="scenarioSettings" class="scenario-settings-grid"></div>
+          <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
+          <div class="form-actions">
+            <a class="button button-secondary" href="index.html">Annuleren</a>
+            <button class="button button-primary" id="saveSettings" type="submit" disabled>Opslaan</button>
+          </div>
         </div>
-        <div id="scenarioSettings" class="scenario-settings-grid"></div>
-        <p class="settings-status" id="settingsStatus" role="status" aria-live="polite"></p>
-        <div class="form-actions">
-          <a class="button button-secondary" href="index.html">Annuleren</a>
-          <button class="button button-primary" id="saveSettings" type="submit" disabled>Opslaan</button>
-        </div>
+        <section id="routeMissingNotice" class="card route-empty-state" hidden>
+          <h2>Geen routedata beschikbaar</h2>
+          <p id="routeMissingMessage">
+            Importeer eerst een GPX op de homepage. Daarna kun je hier schema's instellen en berekenen.
+          </p>
+          <a class="button button-primary" href="index.html">Naar routeimport</a>
+        </section>
       </form>
     </main>
     <script src="schedule.js?v=2"></script>
     <script src="dashboard-common.js?v=1"></script>
-    <script src="settings.js?v=1"></script>
+    <script src="route-storage.js?v=1"></script>
+    <script src="settings.js?v=2"></script>
     <script src="pwa.js?v=1"></script>
   </body>
 </html>

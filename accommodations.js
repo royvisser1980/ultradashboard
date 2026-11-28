@@ -250,9 +250,8 @@ function initializeHotelCollapsibleCards() {
 }
 
 async function loadHotelRouteCoordinates() {
-  const response=await fetch('data.json');
-  if(!response.ok)throw new Error(`De routedata kon niet worden geladen (${response.status}).`);
-  const data=await response.json();
+  const data=await RouteStorage.load();
+  if(!data)return null;
   if(!Array.isArray(data.route)||data.route.length<2) {
     throw new Error('De routedata bevat geen bruikbare route.');
   }
@@ -308,28 +307,34 @@ function initializeHotelMap() {
       hotelMapLayer.setHotels(savedHotels);
       try {
         const routeCoordinates=await loadHotelRouteCoordinates();
-        hotelMap.addSource('route', {
-          type:'geojson',
-          data:{
-            type:'Feature',
-            properties:{},
-            geometry:{type:'LineString',coordinates:routeCoordinates}
-          }
-        });
-        hotelMap.addLayer({
-          id:'route-line',
-          type:'line',
-          source:'route',
-          paint:{
-            'line-color':'#234930',
-            'line-width':5,
-            'line-opacity':0.9
-          }
-        },'saved-accommodations-points');
-        hotelRouteCoordinates=routeCoordinates;
-        $('#showHotelRoute').disabled=false;
-        setHotelRouteVisibility();
-        fitHotelMapToRouteAndHotels();
+        if(routeCoordinates) {
+          hotelMap.addSource('route', {
+            type:'geojson',
+            data:{
+              type:'Feature',
+              properties:{},
+              geometry:{type:'LineString',coordinates:routeCoordinates}
+            }
+          });
+          hotelMap.addLayer({
+            id:'route-line',
+            type:'line',
+            source:'route',
+            paint:{
+              'line-color':'#234930',
+              'line-width':5,
+              'line-opacity':0.9
+            }
+          },'saved-accommodations-points');
+          hotelRouteCoordinates=routeCoordinates;
+          $('#showHotelRoute').disabled=false;
+          setHotelRouteVisibility();
+          fitHotelMapToRouteAndHotels();
+        } else {
+          $('#hotelMapWarn').textContent='Importeer eerst een GPX op de homepage om de route op deze kaart te tonen.';
+          $('#hotelMapWarn').style.display='block';
+          hotelMapLayer.setHotels(savedHotels,true);
+        }
       } catch(error) {
         console.error('De route kon niet op de kaart met accommodaties worden getoond.',error);
         hotelMapLayer.setHotels(savedHotels,true);

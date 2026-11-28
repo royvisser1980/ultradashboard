@@ -3,7 +3,15 @@ const startInput=document.querySelector('#startDate');
 const scenarioContainer=document.querySelector('#scenarioSettings');
 const status=document.querySelector('#settingsStatus');
 const saveButton=document.querySelector('#saveSettings');
+const routeSettingsContent=document.querySelector('#routeSettingsContent');
+const routeMissingNotice=document.querySelector('#routeMissingNotice');
+const routeMissingMessage=document.querySelector('#routeMissingMessage');
 const setStatus=message=>{status.textContent=message};
+function showRouteMissing(message='Importeer eerst een GPX op de homepage. Daarna kun je hier schema’s instellen en berekenen.') {
+  routeSettingsContent.hidden=true;
+  routeMissingMessage.textContent=message;
+  routeMissingNotice.hidden=false;
+}
 const addScenarioButton=document.querySelector('#addScenario');
 let routeTotalKm=0;
 let settingsReady=false;
@@ -462,19 +470,25 @@ form.addEventListener('submit',event=>{
   window.location.href='index.html';
 });
 
-fetch('data.json')
-  .then(response=>{
-    if(!response.ok)throw new Error(`Routedata kon niet worden geladen (${response.status})`);
+Promise.all([
+  fetch('data.json').then(response=>{
+    if(!response.ok)throw new Error(`Instellingen konden niet worden geladen (${response.status})`);
     return response.json();
-  })
-  .then(data=>{
-    const route=data.route;
+  }),
+  RouteStorage.load()
+])
+  .then(([data,routeData])=>{
+    if(!routeData) {
+      showRouteMissing();
+      return;
+    }
+    const route=routeData.route;
     if(!Array.isArray(route)||route.length<2)throw new Error('De route bevat geen bruikbare kilometervakken.');
-    routeTotalKm=Number(route[route.length-1][0]);
+    routeTotalKm=Number(routeData.total);
     if(!Number.isFinite(routeTotalKm)||routeTotalKm<=0)throw new Error('De totale routelengte is ongeldig.');
     const saved=readSavedSettings();
     const defaultStart=data.schedules.start;
-    if(typeof defaultStart!=='string')throw new Error('De standaard starttijd ontbreekt in de routedata.');
+    if(typeof defaultStart!=='string')throw new Error('De standaard starttijd ontbreekt in de schema-instellingen.');
     startInput.value=defaultStart.slice(0,16);
     if(saved&&typeof saved.start==='string'&&!Number.isNaN(new Date(saved.start).getTime())) {
       startInput.value=saved.start.slice(0,16);
@@ -523,5 +537,5 @@ fetch('data.json')
   })
   .catch(error=>{
     console.error(error);
-    setStatus(error.message);
+    showRouteMissing(error.message||'Routedata kon niet uit de browsercache worden geladen.');
   });

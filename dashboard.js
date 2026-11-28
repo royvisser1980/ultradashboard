@@ -533,15 +533,59 @@ progressCanvas.addEventListener('pointermove',e=>{
   if(progressCanvas.hasPointerCapture(e.pointerId))progressPointer(e)
 });
 addEventListener('resize',()=>{drawProfile();drawProgressChart()});
-      fetch('data.json')
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Routedata kon niet worden geladen (${response.status})`);
-          }
+function showRouteUnavailable(reason) {
+  const guidance='Importeer eerst een GPX via Routeimport om het dashboard en de schema-berekeningen te vullen.';
+  const message=reason?`${reason} ${guidance}`:guidance;
+  input.disabled=true;
+  input.value='';
+  $('#routeSummary').textContent=reason||'Er is nog geen route geïmporteerd.';
+  $('#remaining').textContent='—';
+  $('#elevation').textContent='—';
+  $('#currentPlace').textContent='Geen route';
+  const nextPlace=document.createElement('li');
+  nextPlace.textContent=message;
+  $('#nextPlaces').replaceChildren(nextPlace);
+
+  const scenarioMessage=document.createElement('p');
+  scenarioMessage.className='route-empty-state';
+  scenarioMessage.textContent='Schema’s en finishtijden verschijnen nadat je een GPX hebt geïmporteerd.';
+  $('#scenarioCards').replaceChildren(scenarioMessage);
+
+  $('#nearbyHotelsHeading').textContent='Accommodaties langs de route';
+  $('#nearbyHotelsDescription').textContent=guidance;
+  $('#nearbyHotelsList').replaceChildren();
+  $('#nearbyHotelsStatus').textContent=guidance;
+
+  $('#map').hidden=true;
+  $('#mapWarn').style.display='none';
+  $('#mapEmptyState').textContent=message;
+  $('#mapEmptyState').hidden=false;
+  $('#dashboardHotelToggleLabel').hidden=true;
+  $('#dashboardHotelStatus').hidden=true;
+  $('#mapAttribution').hidden=true;
+
+  $('#profileCardContent .profile-wrap').hidden=true;
+  $('#profileCardContent .legend').hidden=true;
+  $('#profileEmptyState').textContent=message;
+  $('#profileEmptyState').hidden=false;
+  $('#progressCardContent .progress-chart-wrap').hidden=true;
+  $('#progressLegend').hidden=true;
+  $('#progressEmptyState').textContent=message;
+  $('#progressEmptyState').hidden=false;
+}
+      Promise.all([
+        fetch('data.json').then(response=>{
+          if(!response.ok)throw new Error(`Instellingen konden niet worden geladen (${response.status})`);
           return response.json();
-        })
-        .then(json => {
-          DATA = json;
+        }),
+        RouteStorage.load()
+      ])
+        .then(([json,routeData]) => {
+          if(!routeData) {
+            showRouteUnavailable();
+            return;
+          }
+          DATA = {...json,...routeData};
           let scenarios;
           try {
             const storedSettings=localStorage.getItem(DashboardCommon.SETTINGS_STORAGE_KEY);
@@ -607,7 +651,5 @@ addEventListener('resize',()=>{drawProfile();drawProgressChart()});
         })
         .catch(error => {
           console.error(error);
-          const warning = $('#mapWarn');
-          warning.style.display = 'block';
-          warning.textContent = error.message || 'De routedata kon niet worden geladen. Open de pagina via een lokale webserver.';
+          showRouteUnavailable(error.message||'Routedata kon niet worden geladen.');
         });
