@@ -9,7 +9,7 @@
     <title>BORDERLINE700 - Gouda-Luxemburg-Gouda ritdashboard</title>
 
     <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
-    <link href="styles.css?v=10" rel="stylesheet">
+    <link href="styles.css?v=12" rel="stylesheet">
     <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
   </head>
   <body>
@@ -32,6 +32,7 @@
           <nav class="header-navigation" aria-label="Navigatie">
             <a class="settings-link" href="settings.html">Schema's</a>
             <a class="settings-link" href="accommodations.html">Accommodaties</a>
+            <a class="settings-link" href="checkpoints.html">Checkpoints</a>
             <button id="routeImportButton" class="settings-link" type="button">Routeimport</button>
           </nav>
           <input id="routeImportFile" type="file" accept=".gpx,application/gpx+xml" hidden>
@@ -48,6 +49,11 @@
               <b id="remaining"></b>
             </div>
             <div class="metric">
+              <span>Tot volgend checkpoint</span>
+              <b id="nextCheckpointDistance">—</b>
+              <span id="nextCheckpointName"></span>
+            </div>
+            <div class="metric">
               <span>Actuele hoogte</span>
               <b id="elevation"></b>
             </div>
@@ -60,6 +66,24 @@
         </section>
 
         <div class="scenario-grid full" id="scenarioCards"></div>
+
+        <section class="card full collapsible-card" data-card-id="checkpoints">
+          <h2 class="collapsible-heading">
+            <button class="card-toggle" type="button" aria-expanded="true" aria-controls="checkpointOverviewContent">
+              <span>Checkpoints</span><span class="card-toggle-icon" aria-hidden="true">▾</span>
+            </button>
+          </h2>
+          <div class="collapsible-content" id="checkpointOverviewContent">
+            <p class="small">De routepositie is een schatting op basis van coördinaten en de Excelvolgorde.
+              Cut-offs worden vergeleken in de lokale tijd van deze browser; overschrijdingen worden naar boven
+              afgerond op hele minuten.</p>
+            <div id="checkpointOverview" class="checkpoint-overview"></div>
+            <p id="checkpointOverviewStatus" class="small" role="status" aria-live="polite">
+              Checkpoints worden geladen.
+            </p>
+            <a href="checkpoints.html">Checkpoints beheren</a>
+          </div>
+        </section>
 
         <section class="card full collapsible-card nearby-hotels-card" data-card-id="nearbyHotels">
           <h2 class="collapsible-heading">
@@ -96,6 +120,10 @@
               <input id="showDashboardHotels" type="checkbox" checked>
               Toon accommodaties op de kaart
             </label>
+            <label id="dashboardCheckpointToggleLabel" class="hotel-map-toggle" for="showDashboardCheckpoints">
+              <input id="showDashboardCheckpoints" type="checkbox" checked>
+              <span><i class="dot checkpoint-dot" aria-hidden="true"></i>Toon checkpoints op de kaart</span>
+            </label>
             <p id="dashboardHotelStatus" class="small" role="status" aria-live="polite">
               Opgeslagen accommodatiecoördinaten worden geladen.
             </p>
@@ -120,7 +148,12 @@
             <div class="legend">
               <span><i class="dot elevation-dot"></i>hoogte</span>
               <span><i class="dot current-km-dot"></i>huidige km-stand</span>
+              <span><i class="dot checkpoint-dot"></i>checkpoints</span>
             </div>
+            <label id="profileCheckpointToggleLabel" class="hotel-map-toggle" for="showProfileCheckpoints">
+              <input id="showProfileCheckpoints" type="checkbox" checked>
+              Toon checkpoints in het hoogteprofiel
+            </label>
           </div>
         </section>
 
@@ -136,17 +169,23 @@
             </div>
             <p id="progressEmptyState" class="route-empty-state" hidden></p>
             <div class="progress-legend" id="progressLegend"></div>
+            <label id="progressCheckpointToggleLabel" class="hotel-map-toggle" for="showProgressCheckpoints">
+              <input id="showProgressCheckpoints" type="checkbox" checked>
+              Toon checkpoints in de voortgangsgrafiek
+            </label>
           </div>
         </section>
       </div>
     </div>
     <script src="accommodation-data.js?v=1"></script>
+    <script src="geocoding.js?v=1"></script>
+    <script src="checkpoint-data.js?v=2"></script>
     <script src="accommodation-map.js?v=4"></script>
     <script src="schedule.js?v=2"></script>
     <script src="route-storage.js?v=1"></script>
     <script src="route-import.js?v=2"></script>
     <script src="pwa.js?v=1"></script>
     <script src="dashboard-common.js?v=1"></script>
-    <script src="dashboard.js?v=2"></script>
+    <script src="dashboard.js?v=4"></script>
   </body>
 </html>

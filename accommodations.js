@@ -2,8 +2,6 @@ const HOTEL_IMPORT_MARKER_KEY='hotel-workbook-imported';
 const HOTEL_STORE_NAME=AccommodationData.STORE_NAME;
 const HOTEL_METADATA_STORE_NAME=AccommodationData.METADATA_STORE_NAME;
 const DEFAULT_HOTEL_RADIUS_KM=10;
-const NOMINATIM_REQUEST_INTERVAL_MS=1500;
-const MAX_HOTEL_IMPORT_FILE_SIZE=5*1024*1024;
 const MAX_IMPORTED_HOTELS=5000;
 const DEMO_HOTELS=[
   {
@@ -38,7 +36,7 @@ const DEMO_HOTELS=[
   geocoder:null
 }));
 let hotelDatabase=null,savedHotels=[],hotelMap=null,hotelMapLayer=null,hotelRouteCoordinates=null;
-let nominatimBusy=false,hotelImportBusy=false,lastNominatimRequestAt=0;
+let nominatimBusy=false,hotelImportBusy=false;
 const hotelMessages=new Map();
 const $=selector=>document.querySelector(selector);
 
@@ -407,24 +405,11 @@ async function initializeDemoHotels() {
   await refreshHotels();
 }
 
-function normalizeHeader(value) {
-  return String(value??'').normalize('NFKC').trim().toLocaleLowerCase('nl-NL');
-}
+const normalizeHeader=SpreadsheetUtils.normalizeHeader;
 
-function normalizeAddress(value) {
-  return String(value??'')
-    .normalize('NFKC')
-    .trim()
-    .replace(/[‐‑‒–—―−]/g,'-')
-    .replace(/[.,;:]/g,' ')
-    .replace(/\s*-\s*/g,'-')
-    .replace(/\s+/g,' ')
-    .toLocaleLowerCase('nl-NL');
-}
+const normalizeAddress=Geocoding.normalizeAddress;
 
-function spreadsheetText(value) {
-  return value==null?'':String(value).trim();
-}
+const spreadsheetText=SpreadsheetUtils.text;
 
 function getHotelImportColumns(headerRow) {
   const headers=headerRow.map(normalizeHeader);
@@ -451,62 +436,10 @@ function getHotelImportColumns(headerRow) {
   return columns;
 }
 
-function parseImportedCoordinate(value,field,minimum,maximum,rowNumber) {
-  const text=spreadsheetText(value).replace(/\s/g,'').replace(',','.');
-  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
-    throw new Error(`Rij ${rowNumber}: "${field}" moet een getal tussen ${minimum} en ${maximum} zijn.`);
-  }
-  const coordinate=Number(text);
-  if(!Number.isFinite(coordinate)||coordinate<minimum||coordinate>maximum) {
-    throw new Error(`Rij ${rowNumber}: "${field}" moet een getal tussen ${minimum} en ${maximum} zijn.`);
-  }
-  return coordinate;
-}
+const parseImportedCoordinate=SpreadsheetUtils.parseCoordinate;
 
 async function parseHotelWorkbook(file) {
-  if(!file.name.toLocaleLowerCase('nl-NL').endsWith('.xlsx')) {
-    throw new Error('Selecteer een Excelbestand met de extensie .xlsx.');
-  }
-  if(file.size===0||file.size>MAX_HOTEL_IMPORT_FILE_SIZE) {
-    throw new Error('Het Excelbestand moet groter zijn dan 0 bytes en maximaal 5 MB zijn.');
-  }
-  if(typeof XLSX==='undefined') {
-    throw new Error('De Excel-parser is niet geladen. Controleer de internetverbinding en probeer het opnieuw.');
-  }
-  const workbookData=await file.arrayBuffer();
-  const signature=new Uint8Array(workbookData,0,Math.min(2,workbookData.byteLength));
-  if(signature[0]!==0x50||signature[1]!==0x4b) {
-    throw new Error('Het bestand heeft geen geldige .xlsx-indeling.');
-  }
-  let workbook;
-  try {
-    workbook=XLSX.read(workbookData,{
-      type:'array',
-      cellFormula:true,
-      cellHTML:false,
-      cellStyles:false,
-      bookVBA:false,
-      sheetRows:MAX_IMPORTED_HOTELS+2
-    });
-  } catch(error) {
-    throw new Error(`Het Excelbestand kon niet worden gelezen: ${error.message||'ongeldige bestandsinhoud'}`);
-  }
-  const sheetName=workbook.SheetNames[0];
-  if(!sheetName)throw new Error('Het Excelbestand bevat geen werkblad.');
-  const worksheet=workbook.Sheets[sheetName];
-  const hasFormula=Object.keys(worksheet).some(address=>
-    !address.startsWith('!')&&worksheet[address]&&worksheet[address].f);
-  if(hasFormula)throw new Error('Gebruik in het Excelbestand alleen vaste waarden, geen formules.');
-  const rows=XLSX.utils.sheet_to_json(worksheet,{
-    header:1,
-    defval:'',
-    raw:false,
-    blankrows:false
-  });
-  if(rows.length<2)throw new Error('Het werkblad bevat geen accommodatiegegevens onder de kolomkoppen.');
-  if(rows.length-1>MAX_IMPORTED_HOTELS) {
-    throw new Error(`Er kunnen maximaal ${MAX_IMPORTED_HOTELS} accommodaties tegelijk worden geïmporteerd.`);
-  }
+  const rows=await SpreadsheetUtils.readRows(file,MAX_IMPORTED_HOTELS,'accommodaties');
   const columns=getHotelImportColumns(rows[0]);
   const hotels=[];
   for(let index=1;index<rows.length;index++) {
@@ -680,33 +613,11 @@ async function importHotelsFromFile() {
   }
 }
 
-async function waitForNominatimSlot() {
-  const delay=Math.max(0,NOMINATIM_REQUEST_INTERVAL_MS-(Date.now()-lastNominatimRequestAt));
-  if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
-  lastNominatimRequestAt=Date.now();
-}
-
 async function requestHotelCoordinates(hotel,fitMap) {
   hotelMessages.set(hotel.id,'Adres wordt naar Nominatim gestuurd voor geocodering…');
   renderHotels();
   try {
-    await waitForNominatimSlot();
-    const url=new URL('https://nominatim.openstreetmap.org/search');
-    url.search=new URLSearchParams({
-      format:'jsonv2',
-      limit:'1',
-      q:hotel.address
-    }).toString();
-    const response=await fetch(url);
-    if(!response.ok)throw new Error(`Nominatim gaf een fout terug (${response.status}).`);
-    const results=await response.json();
-    if(!Array.isArray(results)||results.length===0) {
-      throw new Error('Nominatim vond geen locatie. Controleer het adres en probeer het opnieuw.');
-    }
-    const longitude=Number(results[0].lon),latitude=Number(results[0].lat);
-    if(!Number.isFinite(longitude)||!Number.isFinite(latitude)||Math.abs(longitude)>180||Math.abs(latitude)>90) {
-      throw new Error('Nominatim gaf ongeldige coördinaten terug.');
-    }
+    const {longitude,latitude}=await Geocoding.search(hotel.address);
     await writeHotel({
       ...hotel,
       longitude,
